@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f8f9f5"><title>FIELD</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23171717'/%3E%3Ctext x='10' y='30' font-family='Arial' font-weight='bold' font-size='30' fill='white'%3EF%3C/text%3E%3Ccircle cx='31' cy='9' r='4' fill='%2380d754'/%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"></head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#" aria-label="FIELD home"><span class="logo-crop"><img src="assets/field-logo.png" alt="FIELD"></span></a>
+  <button class="search-launch" id="search-launch"><span data-icon="search"></span> Search <kbd>/</kbd></button>
+  
+  <nav id="main-nav">
+    <button class="nav-item active" data-view="fields"><span data-icon="grid"></span> Fields <span class="nav-count" id="nav-count"></span></button>
+    <button class="nav-item" data-view="everything"><span data-icon="orbit"></span> The big FIELD <span class="tiny-dot"></span></button>
+    <button class="nav-item" data-view="recent"><span data-icon="clock"></span> Recently added</button>
+    <button class="nav-item" data-view="starred"><span data-icon="star"></span> Favorites</button>
+  </nav>
+  <div class="sidebar-divider"></div>
+  <div class="nav-label field-label">PRIMARY FIELDS <button id="sidebar-add" aria-label="Create field">+</button></div>
+  <div id="field-nav" class="field-nav"></div>
+  <div class="sidebar-bottom"><button class="library-settings" id="settings"><span data-icon="sliders"></span> Library <span>↗</span></button></div>
+</aside>
+<main>
+  <header class="topbar"><div class="breadcrumb" id="breadcrumb">Fields</div></header>
+  <div class="content" id="content"></div>
+</main>
+<dialog id="modal"><div id="modal-content"></div></dialog>
+<aside id="detail-panel" class="detail-panel" aria-label="Artifact details" hidden></aside>
+<div id="toast" role="status"></div>
+<link rel="stylesheet" href="mapping.css"><link rel="stylesheet" href="polish.css"><script src="app.js"></script>
+</body></html>
