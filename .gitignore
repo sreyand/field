@@ -1,0 +1,4 @@
+native/bin/
+native/obj/
+tests/native/bin/
+tests/native/obj/

@@ -1,0 +1,58 @@
+using System.Text.Json;
+using Field.Native;
+
+if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("This test exercises Windows file IDs.");
+if (args.Length != 1 || !Path.IsPathFullyQualified(args[0])) throw new ArgumentException("Provide an absolute fixture parent directory.");
+var fixtureRoot = Path.Combine(Path.GetFullPath(args[0]), "field-identity-smoke-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(fixtureRoot);
+var original = Path.Combine(fixtureRoot, "original.txt");
+var renamed = Path.Combine(fixtureRoot, "renamed.txt");
+var subdir = Path.Combine(fixtureRoot, "moved");
+Directory.CreateDirectory(subdir);
+var moved = Path.Combine(subdir, "renamed.txt");
+var other = Path.Combine(subdir, "original.txt");
+int count = 0;
+void Check(bool condition, string name)
+{
+    if (!condition) throw new Exception("FAILED: " + name);
+    Console.WriteLine("PASS " + name);
+    count++;
+}
+File.WriteAllText(original, "FIELD identity fixture");
+var inspected = NativeFileIdentity.Inspect(original);
+Console.WriteLine(JsonSerializer.Serialize(inspected));
+Check(inspected.Status == "available" && inspected.Identity is not null && inspected.Recoverable, "existing local file has a recoverable identity");
+Check(inspected.Size == 22, "metadata reports size without content reads");
+var identity = inspected.Identity!;
+File.Move(original, renamed);
+var afterRename = NativeFileIdentity.Resolve(identity, original);
+Check(afterRename.Status == "available" && afterRename.Path == renamed, "rename follows ID");
+File.Move(renamed, moved);
+var afterMove = NativeFileIdentity.Resolve(identity, renamed);
+Check(afterMove.Status == "available" && afterMove.Path == moved, "move between directories follows ID");
+identity = JsonSerializer.Deserialize<FileIdentityRecord>(JsonSerializer.Serialize(identity))!;
+var restored = NativeFileIdentity.Resolve(identity, original);
+Check(restored.Status == "available" && restored.Path == moved, "serialized identity resolves without prior handles");
+var wrongBirthTime = identity with { CreationTime = (long.Parse(identity.CreationTime) + 1).ToString() };
+Check(NativeFileIdentity.Resolve(wrongBirthTime, moved).Status == "missing", "reused ID with different creation time is never rebound");
+File.WriteAllText(original, "replacement at old path");
+Check(NativeFileIdentity.Resolve(identity, original).Path == moved, "old-path replacement does not steal identity");
+File.WriteAllText(other, "same basename different file");
+Check(!NativeFileIdentity.SameIdentity(identity, NativeFileIdentity.Inspect(other).Identity), "same basename stays distinct");
+File.Delete(moved);
+var replaced = NativeFileIdentity.Resolve(identity, original);
+Check(replaced.Status == "replaced", "deleted original plus replacement requires relinking");
+Check(NativeFileIdentity.SameIdentity(replaced.Identity, identity), "missing reference retains original identity");
+File.Delete(original);
+var missing = NativeFileIdentity.Resolve(identity, original);
+Console.WriteLine("Deleted reference: " + JsonSerializer.Serialize(missing));
+Check(missing.Status == "missing", "deleted original is missing on online drive");
+var unavailableIdentity = identity with { VolumePath = @"\\?\Volume{00000000-0000-0000-0000-000000000000}\" };
+Check(NativeFileIdentity.Resolve(unavailableIdentity, original).Status == "unavailable", "unavailable drive is distinct from missing file");
+Check(NativeFileIdentity.Inspect(subdir).Status == "unsupported", "directory is rejected");
+Check(NativeFileIdentity.Inspect("relative.txt").Status == "unsupported", "relative paths are rejected");
+Check(NativeFileIdentity.Inspect(other + ":stream").Status == "unsupported", "alternate streams are rejected");
+File.Delete(other);
+Directory.Delete(subdir);
+Directory.Delete(fixtureRoot);
+Console.WriteLine($"{count} Windows identity checks passed.");

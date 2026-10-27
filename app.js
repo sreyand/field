@@ -1,6 +1,6 @@
 'use strict';
 
-// Prototype state. There is no seeded content or filesystem indexing.
+// Canonical records and memberships are stored locally. Fresh libraries have no seeded content.
 const fields = [];
 const items = [];
 const connections = [];
@@ -27,7 +27,7 @@ const paths = {
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
   down: '<path d="m7 10 5 5 5-5"/>',
   external: '<path d="M13 4h7v7M20 4 10 14M10 5H4v15h15v-6"/>',
-  settings: '<path d="m9 3-1 3-3 1-2 3 2 3v4l3 2 3-1 3 1 3-2v-4l2-3-2-3-3-1-1-3Z"/><circle cx="11" cy="11" r="3"/>',
+  settings: '<path d="m10 4-1 3-3 1-2 3 2 3v4l3 2 3-1 3 1 3-2v-4l2-3-2-3-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/>',
   subfield: '<path d="M5 3v12a4 4 0 0 0 4 4h10M15 15l4 4-4 4M10 6h9M14.5 1.5v9"/>',
   copy: '<rect x="8" y="8" width="12" height="13" rx="1"/><path d="M16 8V3H3v13h5"/>',
   undo: '<path d="M8 5 3 10l5 5M3 10h10a6 6 0 0 1 0 12"/>',
@@ -52,6 +52,154 @@ let zoom = 1;
 let dragged = false;
 let drawingPad = null;
 let returnFocus = null;
+let canonicalModel = null;
+let libraryRevision = 0;
+let isReady = false;
+let isSaving = false;
+let storageError = '';
+let openItemId = null;
+let nativeBusy = false;
+let syncingFiles = false;
+let fileSyncPaused = false;
+const fileStates = new Map();
+const native = window.FieldNative;
+const repository = window.FieldStorage.open();
+
+function applyModel(model) {
+  canonicalModel = model;
+  for (const [viewArray, records] of [[fields, model.fields], [items, model.items], [connections, model.connections]]) {
+    viewArray.length = 0;
+    for (const record of records) viewArray.push(record);
+  }
+}
+
+async function initializeLibrary() {
+  try {
+    const saved = await repository.load();
+    const model = new window.FieldModel.LibraryModel(saved.snapshot);
+    applyModel(model);
+    libraryRevision = saved.revision;
+    isReady = true;
+  } catch (error) {
+    storageError = error.message;
+  }
+  render();
+  await native.ready;
+  syncFileReferences();
+}
+
+function nativeSnapshot(reference) {
+  const { referenceId, identity, path, fileName, size, modifiedUtc, status, recoverable, message } = reference;
+  return { referenceId, identity, path, fileName, size, modifiedUtc, status, recoverable, message };
+}
+
+function filePatch(item, reference) {
+  const patch = { native: nativeSnapshot(reference) };
+  if (reference.path) patch.path = reference.path;
+  if (reference.status === 'available') {
+    Object.assign(patch, { fileName: reference.fileName, modifiedUtc: reference.modifiedUtc });
+    if (Number.isSafeInteger(reference.size)) patch.size = reference.size;
+    if (item.title === item.fileName) patch.title = reference.fileName;
+  }
+  return patch;
+}
+
+function fileState(item) {
+  if (!item.native) return { status: 'untracked', label: 'Untracked' };
+  if (!native.available) return { status: 'offline', label: 'Tracking offline', message: 'Open FIELD.cmd to reconnect.' };
+  const state = fileStates.get(item.id) || item.native;
+  const labels = { available: state.recoverable ? 'Available' : 'Path only', missing: 'Missing', unavailable: 'Unavailable', inaccessible: 'Access denied', unsupported: 'Relink required', replaced: 'File replaced', unregistered: 'Relink required' };
+  return { ...state, label: labels[state.status] || 'Unavailable' };
+}
+
+function fileStatus(item, detail = false) {
+  const state = fileState(item);
+  if (!detail && state.status === 'available' && state.recoverable) return '';
+  return `<span class="file-status ${state.status === 'available' ? 'available' : ''}" data-file-status="${escapeHTML(state.status)}">${escapeHTML(state.label)}</span>${detail && state.message ? `<p class="file-status-message">${escapeHTML(state.message)}</p>` : ''}`;
+}
+
+function renderFileChanges() {
+  const focused = document.activeElement.closest('[data-action]');
+  const focusAction = focused?.dataset.action;
+  const focusId = focused?.dataset.id;
+  const selected = openItemId;
+  render();
+  if (selected && byItem(selected)) openItem(selected);
+  if (focusAction) [...document.querySelectorAll('[data-action]')].find(node => node.dataset.action === focusAction && node.dataset.id === focusId)?.focus({ preventScroll: true });
+}
+
+async function syncFileReferences(force = false) {
+  if (!isReady || isSaving || nativeBusy || syncingFiles || fileSyncPaused || $('#modal').open || dragged || document.hidden && !force) return;
+  const tracked = items.filter(item => item.kind === 'file' && item.native);
+  if (!tracked.length) return;
+  syncingFiles = true;
+  try {
+    if (!native.available && !await native.connect()) return;
+    const references = [];
+    const ids = [...new Set(tracked.map(item => item.native.referenceId))];
+    for (let offset = 0; offset < ids.length; offset += 100) references.push(...await native.resolve(ids.slice(offset, offset + 100)));
+    // A modal or relink may have opened while metadata was being checked.
+    if (isSaving || nativeBusy || $('#modal').open) return;
+    const found = new Map(references.map(reference => [reference.referenceId, reference]));
+    const updates = [];
+    let statesChanged = false;
+    for (const before of tracked) {
+      const item = byItem(before.id);
+      const reference = found.get(before.native.referenceId);
+      if (!item || item.native?.referenceId !== before.native.referenceId || !reference) continue;
+      const state = nativeSnapshot(reference);
+      if (JSON.stringify(fileStates.get(item.id)) !== JSON.stringify(state)) statesChanged = true;
+      fileStates.set(item.id, state);
+      if (reference.status === 'unregistered') continue;
+      const patch = filePatch(item, reference);
+      if (Object.entries(patch).some(([key, value]) => JSON.stringify(item[key]) !== JSON.stringify(value))) updates.push([item.id, patch]);
+    }
+    if (updates.length) {
+      await saveMutation(model => updates.forEach(([id, patch]) => model.updateItem(id, patch)));
+    }
+    if (updates.length || statesChanged) renderFileChanges();
+  } catch (error) {
+    if (native.available) {
+      fileSyncPaused = true;
+      toast(saveError(error));
+    }
+  } finally { syncingFiles = false; }
+}
+
+window.addEventListener('field-runtime-change', () => {
+  if (isReady && !isSaving && !nativeBusy && !$('#modal').open) renderFileChanges();
+});
+setInterval(syncFileReferences, 2500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFileReferences(true); });
+
+function saveError(error) {
+  return error.name === 'QuotaExceededError' ? 'Device storage is full. Your changes were not saved.' : error.message;
+}
+
+async function saveMutation(change, form) {
+  if (!isReady) throw new Error('The library is not ready.');
+  if (isSaving) throw new Error('A save is already in progress.');
+  const candidate = new window.FieldModel.LibraryModel(canonicalModel.snapshot());
+  const result = change(candidate);
+  const submit = form?.querySelector('[type=submit]');
+  const activeForm = form || $('#modal-content');
+  const wasInert = activeForm.inert;
+  activeForm.inert = true;
+  isSaving = true;
+  document.body.setAttribute('aria-busy', 'true');
+  if (submit) submit.disabled = true;
+  try {
+    const saved = await repository.save(candidate.snapshot(), libraryRevision);
+    applyModel(candidate);
+    libraryRevision = saved.revision;
+    return result;
+  } finally {
+    isSaving = false;
+    document.body.removeAttribute('aria-busy');
+    activeForm.inert = wasInert;
+    if (submit?.isConnected) submit.disabled = false;
+  }
+}
 
 function ancestry(id) {
   const result = [];
@@ -87,7 +235,7 @@ function heading(title, actions, count = null) {
 }
 
 function addMenu() {
-  return `<div class="add-menu-wrap">${button('Add', 'toggle-add', 'primary', 'aria-expanded="false" aria-controls="add-menu"', 'plus')}<div class="add-menu" id="add-menu" hidden>${Object.entries(kinds).map(([kind, meta]) => `<button data-action="add-item" data-kind="${kind}">${icon(meta.icon)}${meta.label}</button>`).join('')}</div></div>`;
+  return `<div class="add-menu-wrap">${button('Add', 'toggle-add', 'primary', 'aria-expanded="false" aria-controls="add-menu"', 'plus')}<div class="add-menu" id="add-menu" hidden>${Object.entries(kinds).map(([kind, meta]) => `<button data-action="add-item" data-kind="${kind}">${icon(meta.icon)}${meta.label}</button>`).join('')}${currentField && items.length ? `<div class="menu-separator"></div><button data-action="add-existing">${icon('link')}Existing item</button>` : ''}</div></div>`;
 }
 
 function navigate(next, id = null) {
@@ -99,7 +247,14 @@ function navigate(next, id = null) {
 }
 
 function renderSidebar() {
-  document.querySelectorAll('[data-view]').forEach(node => node.classList.toggle('active', node.dataset.view === (view === 'field' ? 'fields' : view)));
+  document.querySelectorAll('[data-view]').forEach(node => {
+    const active = node.dataset.view === (view === 'field' ? 'fields' : view);
+    node.classList.toggle('active', active);
+    if (active) node.setAttribute('aria-current', 'page');
+    else node.removeAttribute('aria-current');
+  });
+  if (view === 'everything') $('.brand').setAttribute('aria-current', 'page');
+  else $('.brand').removeAttribute('aria-current');
   $('#field-count').textContent = fields.length ? fields.filter(field => !field.parent).length : '';
   const renderTree = (parent, depth = 0) => fields.filter(field => field.parent === parent).map(field => `<button data-action="open-field" data-id="${field.id}" class="${currentField === field.id ? 'current' : ''}" style="padding-left:${14 + depth * 13}px;--field-color:${field.color}"><span class="field-dot"></span><span class="nav-field-name">${escapeHTML(field.name)}</span></button>${renderTree(field.id, depth + 1)}`).join('');
   $('#field-navigation').innerHTML = fields.length ? `<div class="section-label">Fields</div>${renderTree(null)}` : '';
@@ -107,19 +262,23 @@ function renderSidebar() {
 
 function render() {
   mapObserver?.disconnect();
+  if (!isReady) {
+    $('#content').innerHTML = storageError ? heading('Library unavailable', '') + `<p class="storage-error" role="alert">${escapeHTML(storageError)}</p>` + button('Reload', 'reload-library', 'secondary') : '<div class="empty-state">Loading…</div>';
+    return;
+  }
   renderSidebar();
   $('#content').innerHTML = view === 'field' ? renderField() : view === 'everything' ? renderEverything() : renderFields();
   if (view === 'everything' && everythingMode === 'map' && fields.length) initMap();
 }
 
-function renderFieldCard(field) {
+function renderFieldRow(field) {
   const count = itemsIn(field.id).length;
-  return `<button class="field-card" data-action="open-field" data-id="${field.id}" style="--field-color:${field.color}">${icon('folder')}<div class="field-card-info"><strong>${escapeHTML(field.name)}</strong><small>${count} ${count === 1 ? 'item' : 'items'}</small></div></button>`;
+  return `<button class="entry-row field-row" data-action="open-field" data-id="${field.id}" style="--field-color:${field.color}"><span class="entry-icon">${icon('folder')}</span><span class="field-row-info"><strong class="entry-name" title="${escapeHTML(field.name)}">${escapeHTML(field.name)}</strong><small class="entry-count">${count} ${count === 1 ? 'item' : 'items'}</small></span></button>`;
 }
 
 function renderFields() {
   const roots = fields.filter(field => !field.parent);
-  return heading('Fields', button('New field', 'new-field', 'primary', '', 'plus'), roots.length) + '<div class="rule"></div>' + (roots.length ? `<div class="field-grid">${roots.map(renderFieldCard).join('')}</div>` : '<div class="empty-state">No fields</div>');
+  return heading('Fields', button('New field', 'new-field', 'primary', '', 'plus')) + (roots.length ? `<div class="entry-list field-list">${roots.map(renderFieldRow).join('')}</div>` : '<div class="empty-state">No fields</div>');
 }
 
 function renderFilters() {
@@ -130,12 +289,14 @@ function renderItem(item) {
   const meta = kinds[item.kind];
   const notePreview = item.kind === 'note' ? (item.body === item.title ? '' : item.body.startsWith(item.title + '\n') ? item.body.slice(item.title.length + 1) : item.body) : '';
   const extra = item.kind === 'link' ? new URL(item.url).hostname : item.kind === 'file' ? (item.path || (item.fileName !== item.title ? item.fileName : '') || '') : '';
-  return `<button class="item-card" data-action="open-item" data-id="${item.id}">${item.kind === 'drawing' ? `<img class="drawing-preview" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : ''}<div class="item-card-top">${icon(meta.icon)}${meta.label}${item.fields.length > 1 ? `<span class="membership-count">${icon('link')}${item.fields.length}</span>` : ''}</div><h3>${escapeHTML(item.title)}</h3>${notePreview ? `<p>${escapeHTML(notePreview.slice(0, 350))}</p>` : extra ? `<small>${escapeHTML(extra)}</small>` : ''}${item.kind === 'file' && item.size !== undefined ? `<div class="item-card-bottom">${formatSize(item.size)}</div>` : ''}</button>`;
+  const description = notePreview || extra;
+  const metadata = (description ? `<span class="item-description">${escapeHTML(description.replace(/\s+/g, ' ').slice(0, 350))}</span>` : '') + (item.kind === 'file' ? fileStatus(item) + (item.size !== undefined ? `<span class="file-size">${formatSize(item.size)}</span>` : '') : '');
+  return `<button class="entry-row item-row" data-action="open-item" data-id="${item.id}"><span class="entry-icon">${icon(meta.icon)}</span><span class="sr-only">${meta.label}: </span><span class="entry-content"><span class="entry-heading"><strong class="entry-name" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</strong>${item.fields.length > 1 ? `<span class="membership-count">${icon('link')}<span>${item.fields.length}<span class="sr-only"> fields</span></span></span>` : ''}</span>${metadata ? `<span class="entry-meta">${metadata}</span>` : ''}</span>${item.kind === 'drawing' ? `<img class="item-thumbnail" src="${item.drawing}" alt="">` : ''}</button>`;
 }
 
 function renderItems(list) {
   const visible = list.filter(item => itemFilter === 'all' || item.kind === itemFilter);
-  return (list.length ? renderFilters() : '') + (visible.length ? `<div class="item-grid">${visible.map(renderItem).join('')}</div>` : `<div class="empty-state">${itemFilter === 'all' ? 'No items' : `No ${kinds[itemFilter].plural.toLowerCase()}`}</div>`);
+  return (list.length ? renderFilters() : '') + (visible.length ? `<div class="entry-list item-list">${visible.map(renderItem).join('')}</div>` : `<div class="empty-state">${itemFilter === 'all' ? 'No items' : `No ${kinds[itemFilter].plural.toLowerCase()}`}</div>`);
 }
 
 function renderField() {
@@ -146,15 +307,15 @@ function renderField() {
   const related = allEdges().filter(edge => edge.kind !== 'parent' && [edge.from, edge.to].includes(field.id));
   const crumbs = `<div class="breadcrumb"><button data-action="go-fields">Fields</button>${parents.map(parent => `<span>/</span><button data-action="open-field" data-id="${parent.id}">${escapeHTML(parent.name)}</button>`).join('')}<span>/</span><span>${escapeHTML(field.name)}</span></div>`;
   const actions = button('<span class="action-label">Subfield</span>', 'new-field', 'quiet', `data-parent="${field.id}" aria-label="New subfield"`, 'subfield') + (fields.length > 1 ? button('', 'connect-fields', 'quiet', 'aria-label="Connect fields"', 'link') : '') + addMenu();
-  return crumbs + heading(field.name, actions, list.length) + (children.length ? `<div class="subfields">${children.map(child => `<button class="subfield" data-action="open-field" data-id="${child.id}" style="--field-color:${child.color}">${icon('folder')}${escapeHTML(child.name)}<small>${itemsIn(child.id).length}</small></button>`).join('')}</div>` : '') + renderItems(list) + (related.length ? `<div class="section-heading">Connections</div><div class="connections">${related.map(edge => `<button class="connection-chip" data-action="open-edge" data-id="${edge.id}">${icon('link')}${escapeHTML(byField(edge.from === field.id ? edge.to : edge.from).name)}<span>${escapeHTML(edge.label)}</span></button>`).join('')}</div>` : '');
+  return crumbs + heading(field.name, actions, list.length) + (children.length ? `<div class="entry-list subfield-list">${children.map(renderFieldRow).join('')}</div>` : '') + renderItems(list) + (related.length ? `<div class="section-heading">Connections</div><div class="connections">${related.map(edge => `<button class="connection-chip" data-action="open-edge" data-id="${edge.id}">${icon('link')}${escapeHTML(byField(edge.from === field.id ? edge.to : edge.from).name)}<span>${escapeHTML(edge.label)}</span></button>`).join('')}</div>` : '');
 }
 
 function renderEverything() {
   const actions = fields.length ? addMenu() : button('New field', 'new-field', 'primary', '', 'plus');
   const tools = `<div class="everything-toolbar"><div class="segmented">${[['map', 'Map'], ['items', 'Items']].map(([key, label]) => `<button class="${everythingMode === key ? 'active' : ''}" data-action="everything-mode" data-mode="${key}">${label}</button>`).join('')}</div>${everythingMode === 'map' && fields.length > 1 ? button('Connect', 'connect-fields', 'secondary compact', '', 'link') : ''}</div>`;
-  if (everythingMode === 'items') return heading('The big FIELD', actions, items.length) + tools + renderItems([...items].reverse());
+  if (everythingMode === 'items') return heading('FIELD', actions, items.length) + tools + renderItems([...items].reverse());
   const edge = allEdges().find(candidate => candidate.id === selectedEdge && candidate.kind !== 'parent');
-  return heading('The big FIELD', actions) + tools + (!fields.length ? '<div class="empty-state">No fields</div>' : `<div class="map-layout ${edge ? 'has-inspector' : ''}"><div class="map-shell" id="map-shell"><div class="graph-stage" id="graph-stage"><svg class="graph-lines" id="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div><div id="graph-labels"></div></div><div class="map-legend"><span><i></i> Shared items</span><span><i class="dashed"></i> Connection</span></div><div class="map-controls"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="zoom-reset" aria-label="Fit map">${icon('grid')}</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div></div>${edge ? renderInspector(edge) : ''}</div>`);
+  return heading('FIELD', actions) + tools + (!fields.length ? '<div class="empty-state">No fields</div>' : `<div class="map-layout ${edge ? 'has-inspector' : ''}"><div class="map-shell" id="map-shell"><div class="graph-stage" id="graph-stage"><svg class="graph-lines" id="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div><div id="graph-labels"></div></div><div class="map-legend"><span><i></i> Shared items</span><span><i class="dashed"></i> Connection</span></div><div class="map-controls"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="zoom-reset" aria-label="Fit map">${icon('grid')}</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div></div>${edge ? renderInspector(edge) : ''}</div>`);
 }
 
 function allEdges() {
@@ -241,7 +402,7 @@ function toast(message) {
 
 function newField(parent = null) {
   let color = parent ? byField(parent).color : colors[0];
-  showModal(parent ? 'New subfield' : 'New field', `<form id="field-form"><label class="form-label" for="field-name">Name</label><input class="input" id="field-name" maxlength="64" required autocomplete="off"><div class="swatches">${colors.map(candidate => `<button type="button" class="swatch ${candidate === color ? 'selected' : ''}" style="--swatch:${candidate}" data-color="${candidate}" aria-label="${candidate}" aria-pressed="${candidate === color}"></button>`).join('')}</div><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Create</button></div></form>`);
+  showModal(parent ? 'New subfield' : 'New field', `<form id="field-form"><label class="form-label" for="field-name">Name</label><input class="input" id="field-name" maxlength="64" required autocomplete="off"><div class="swatches">${colors.map(candidate => `<button type="button" class="swatch ${candidate === color ? 'selected' : ''}" style="--swatch:${candidate}" data-color="${candidate}" aria-label="${candidate}" aria-pressed="${candidate === color}"></button>`).join('')}</div><p class="form-error" id="field-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Create</button></div></form>`);
   document.querySelectorAll('[data-color]').forEach(node => node.onclick = () => {
     color = node.dataset.color;
     document.querySelectorAll('[data-color]').forEach(candidate => {
@@ -249,14 +410,19 @@ function newField(parent = null) {
       candidate.setAttribute('aria-pressed', String(candidate === node));
     });
   });
-  $('#field-form').onsubmit = event => {
+  $('#field-form').onsubmit = async event => {
     event.preventDefault();
+    if (isSaving) return;
     const name = $('#field-name').value.trim();
     if (!name) return;
     const field = { id: uid('field'), name, color, parent };
-    fields.push(field);
-    closeModal();
-    navigate('field', field.id);
+    try {
+      await saveMutation(model => model.createField(field), event.currentTarget);
+      closeModal();
+      navigate('field', field.id);
+    } catch (error) {
+      $('#field-error').textContent = saveError(error);
+    }
   };
 }
 
@@ -272,11 +438,14 @@ function normalizeURL(raw) {
   return url.href;
 }
 
-function compose(kind, existingId = null) {
+function compose(kind, existingId = null, relinking = false) {
   const existing = existingId ? byItem(existingId) : null;
   const inField = currentField;
   if (!fields.length) return newField();
   let chosenFile = existingId ? attachments.get(existingId)?.file : null;
+  let selectedNewFile = false;
+  let selectedReference = existing?.native || null;
+  let preparing = false;
   const fieldSelect = !existing && !inField ? `<label class="form-label" for="item-field">Field</label><select class="input" id="item-field">${fieldOptions(fields[0].id)}</select>` : '';
   let body = '';
   if (kind === 'link') body = `<label class="form-label" for="item-url">URL</label><input class="input" id="item-url" placeholder="https://" value="${escapeHTML(existing?.url || '')}" required>`;
@@ -284,14 +453,44 @@ function compose(kind, existingId = null) {
   body += `<label class="form-label" for="item-title">Name <span class="optional">optional</span></label><input class="input" id="item-title" maxlength="120" value="${escapeHTML(existing?.title || '')}">`;
   if (kind === 'note') body += `<label class="form-label" for="item-body">Note</label><textarea class="input note-body" id="item-body" required>${escapeHTML(existing?.body || '')}</textarea>`;
   if (kind === 'drawing') body += `<div class="drawing-toolbar"><input type="color" id="pen-color" class="drawing-color" value="#d5dff3" aria-label="Pen color"><input type="range" id="pen-width" min="1" max="12" value="2" aria-label="Pen width"><button class="button secondary compact" type="button" id="drawing-undo">${icon('undo')}Undo</button><button class="button secondary compact" type="button" id="drawing-clear">Clear</button></div><canvas class="drawing-canvas" id="drawing-canvas" aria-label="Drawing canvas"></canvas>`;
-  showModal(`${existing ? 'Edit' : 'New'} ${typeName(kind).toLowerCase()}`, `<form id="item-form">${body}${fieldSelect}<p class="form-error" id="item-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">${existing ? 'Save' : 'Add'}</button></div></form>`, kind === 'note' || kind === 'drawing');
-  if (kind === 'file') $('#choose-file').onclick = () => $('#file-input').click();
+  showModal(relinking ? 'Relink file' : `${existing ? 'Edit' : 'New'} ${typeName(kind).toLowerCase()}`, `<form id="item-form">${body}${fieldSelect}<p class="form-error" id="item-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">${relinking ? 'Relink' : existing ? 'Save' : 'Add'}</button></div></form>`, kind === 'note' || kind === 'drawing');
+  if (kind === 'file') $('#choose-file').onclick = async () => {
+    if (nativeBusy) return;
+    if (!native.available) {
+      if (existing?.native || relinking) { $('#item-error').textContent = 'Open FIELD.cmd to connect file tracking.'; return; }
+      $('#file-input').click();
+      return;
+    }
+    const form = $('#item-form');
+    nativeBusy = true;
+    form.inert = true;
+    try {
+      const reference = await native.pick();
+      if (!reference) return;
+      selectedReference = reference;
+      selectedNewFile = true;
+      chosenFile = null;
+      $('#item-path').value = reference.path;
+      $('#file-picker-name').textContent = reference.fileName;
+      if (!$('#item-title').value || existing && existing.title === existing.fileName && $('#item-title').value === existing.title) $('#item-title').value = reference.fileName;
+      $('#item-error').textContent = '';
+    } catch (error) { $('#item-error').textContent = error.message; }
+    finally { nativeBusy = false; form.inert = false; $('#choose-file').focus(); }
+  };
   if (kind === 'file') $('#file-input').onchange = event => {
     if (!event.target.files[0]) return;
     chosenFile = event.target.files[0];
+    selectedReference = null;
+    selectedNewFile = true;
     $('#item-path').value = '';
     $('#file-picker-name').textContent = chosenFile?.name || '';
     if (!$('#item-title').value && chosenFile) $('#item-title').value = chosenFile.name;
+  };
+  if (kind === 'file') $('#item-path').oninput = () => {
+    if (selectedReference?.path !== $('#item-path').value.trim()) selectedReference = null;
+    if (selectedNewFile && !selectedReference) chosenFile = null;
+    else chosenFile = existing && $('#item-path').value.trim() === (existing.path || '') ? attachments.get(existing.id)?.file : null;
+    $('#file-picker-name').textContent = chosenFile?.name || '';
   };
   if (kind === 'drawing') {
     drawingPad = window.FieldDrawing.mount($('#drawing-canvas'), { color: '#d5dff3', lineWidth: 2, initialDataUrl: existing?.drawing });
@@ -300,10 +499,15 @@ function compose(kind, existingId = null) {
     $('#drawing-undo').onclick = () => drawingPad.undo();
     $('#drawing-clear').onclick = () => drawingPad.clear();
   }
-  $('#item-form').onsubmit = event => {
+  $('#item-form').onsubmit = async event => {
     event.preventDefault();
+    if (isSaving || preparing) return;
+    preparing = true;
+    nativeBusy = true;
+    const form = event.currentTarget;
+    form.inert = true;
     try {
-      const record = existing ? { ...existing } : { id: uid('item'), kind, fields: [inField || $('#item-field').value], createdAt: Date.now() };
+      const record = existing ? { ...existing } : { id: uid('item'), kind, createdAt: Date.now() };
       let title = $('#item-title').value.trim();
       if (kind === 'link') {
         record.url = normalizeURL($('#item-url').value);
@@ -316,10 +520,29 @@ function compose(kind, existingId = null) {
         record.path = $('#item-path').value.trim();
         if (!chosenFile && !record.path) throw new Error('Select a file or enter its PC path.');
         if (record.path && !/^(?:[a-z]:[\\/]|\\\\)/i.test(record.path)) throw new Error('Enter an absolute Windows path.');
-        record.fileName = chosenFile?.name || record.path.split(/[\\/]/).pop();
-        if (chosenFile) {
+        const unchanged = existing?.native && !selectedNewFile && record.path === existing.path && !relinking;
+        if (unchanged) {
+          // Editing a name while the drive is offline must retain the original identity.
+          const reference = native.available ? (await native.resolve([existing.native.referenceId]))[0] : null;
+          if (reference && reference.status !== 'unregistered') Object.assign(record, filePatch(existing, reference));
+          if (title === existing.fileName) title = record.fileName;
+        } else if (record.path && native.available) {
+          const reference = selectedReference?.path === record.path && selectedNewFile ? selectedReference : await native.track(record.path);
+          Object.assign(record, filePatch(existing || record, reference));
+          chosenFile = null;
+          if (existing && existing.title === existing.fileName && title === existing.title) title = reference.fileName;
+        } else if (existing?.native || relinking) {
+          throw new Error('Open FIELD.cmd to relink this file.');
+        } else {
+          record.native = null;
+          record.fileName = chosenFile?.name || record.path.split(/[\\/]/).pop();
+        }
+        if (chosenFile && !record.native) {
           record.size = chosenFile.size;
           record.mime = chosenFile.type;
+        } else if (!record.native && existing && record.path !== (existing.path || '')) {
+          delete record.size;
+          delete record.mime;
         }
         title ||= record.fileName;
       } else if (kind === 'drawing') {
@@ -328,47 +551,96 @@ function compose(kind, existingId = null) {
         title ||= 'Drawing';
       }
       record.title = title;
-      if (chosenFile) {
-        attachments.get(record.id)?.url && URL.revokeObjectURL(attachments.get(record.id).url);
-        attachments.set(record.id, { file: chosenFile, url: URL.createObjectURL(chosenFile) });
+      const target = inField || $('#item-field')?.value;
+      const result = await saveMutation(model => {
+        if (existing) {
+          model.updateItem(existing.id, record);
+          return { itemId: existing.id, created: false, edited: true };
+        }
+        return model.createItem(record, [target]);
+      }, form);
+      if (existing?.kind === 'file' && (record.native || !chosenFile && record.path !== (existing.path || ''))) {
+        attachments.get(result.itemId)?.url && URL.revokeObjectURL(attachments.get(result.itemId).url);
+        attachments.delete(result.itemId);
       }
-      if (existing) items.splice(items.indexOf(existing), 1, record);
-      else items.push(record);
+      if (chosenFile && (result.created || result.edited)) {
+        attachments.get(result.itemId)?.url && URL.revokeObjectURL(attachments.get(result.itemId).url);
+        attachments.set(result.itemId, { file: chosenFile, url: URL.createObjectURL(chosenFile) });
+      }
+      if (record.native && (result.created || result.edited)) fileStates.set(result.itemId, record.native);
       closeModal();
       itemFilter = 'all';
       render();
-      if (existing) openItem(record.id);
+      if (existing || !result.created) openItem(result.itemId);
+      if (!existing && !result.created) toast(result.added ? 'Existing item added to field' : 'Already in this field');
     } catch (error) {
-      $('#item-error').textContent = error.message === 'Invalid URL' ? 'Enter a valid URL.' : error.message;
-    }
+      $('#item-error').textContent = error.message === 'Invalid URL' ? 'Enter a valid URL.' : saveError(error);
+    } finally { preparing = false; nativeBusy = false; form.inert = false; }
   };
 }
 
 function openItem(id) {
   const item = byItem(id);
+  if (!item) return;
+  openItemId = id;
   const file = attachments.get(id);
   const meta = kinds[item.kind];
   let body = item.kind === 'note' ? `<div class="detail-body">${escapeHTML(item.body)}</div>` : item.kind === 'drawing' ? `<img class="detail-drawing" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : item.kind === 'link' ? `<a class="detail-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.url)}</a>` : `${file && item.mime?.startsWith('image/') ? `<img class="detail-image" src="${file.url}" alt="${escapeHTML(item.title)}">` : ''}${item.path ? `<div class="detail-path">${escapeHTML(item.path)}</div>` : `<div class="detail-path">${escapeHTML(item.fileName)}</div>`}${item.size !== undefined ? `<div class="detail-metadata">${formatSize(item.size)}</div>` : ''}`;
   const openAction = item.kind === 'link' ? `<a class="button secondary compact" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${icon('external')}Open</a>` : item.kind === 'file' ? (file ? `<a class="button secondary compact" href="${file.url}" target="_blank" rel="noopener">${icon('external')}Open file</a>` : '') + (item.path ? button('Copy path', 'copy-path', 'secondary compact', `data-id="${id}"`, 'copy') : '') : item.kind === 'drawing' ? `<a class="button secondary compact" href="${item.drawing}" download="${escapeHTML(item.title.replace(/[^a-z0-9_-]/gi, '_'))}.png">Save PNG</a>` : '';
-  $('#detail-panel').innerHTML = `<div class="detail-top"><span>${icon(meta.icon)}${meta.label}</span><button class="icon-button" data-action="close-detail" aria-label="Close item">${icon('close')}</button></div><h2>${escapeHTML(item.title)}</h2>${body}<div class="detail-actions">${openAction}${button('Edit', 'edit-item', 'secondary compact', `data-id="${id}"`)}</div><div class="detail-fields-title"><span>Fields</span>${button('Add to field', 'share-item', 'quiet compact', `data-id="${id}"`, 'plus')}</div><div class="membership-list">${item.fields.map(fieldId => `<button data-action="open-field" data-id="${fieldId}" style="--field-color:${byField(fieldId).color}"><span class="field-dot"></span>${escapeHTML(fieldPath(fieldId))}<span class="membership-arrow">↗</span></button>`).join('')}</div>`;
+  const nativeActions = item.kind === 'file' && item.native ? button('Open file', 'open-native-file', 'secondary compact', `data-id="${id}" ${fileState(item).status !== 'available' ? 'disabled' : ''}`, 'external') : '';
+  const relinkAction = item.kind === 'file' ? button(item.native ? 'Relink' : native.available ? 'Track file' : 'Reconnect', 'relink-file', 'secondary compact', `data-id="${id}"`) : '';
+  $('#detail-panel').innerHTML = `<div class="detail-top"><span>${icon(meta.icon)}${meta.label}</span><button class="icon-button" data-action="close-detail" aria-label="Close item">${icon('close')}</button></div><h2>${escapeHTML(item.title)}</h2>${body}${item.kind === 'file' ? fileStatus(item, true) : ''}<div class="detail-actions">${nativeActions}${openAction}${button('Edit', 'edit-item', 'secondary compact', `data-id="${id}"`)}${relinkAction}</div><div class="detail-fields-title"><span>Fields</span>${button('Manage', 'share-item', 'quiet compact', `data-id="${id}"`)}</div><div class="membership-list">${item.fields.map(fieldId => `<button data-action="open-field" data-id="${fieldId}" style="--field-color:${byField(fieldId).color}"><span class="field-dot"></span>${escapeHTML(fieldPath(fieldId))}<span class="membership-arrow">↗</span></button>`).join('') || '<div class="blank-message">No fields</div>'}</div>`;
   $('#detail-panel').hidden = false;
 }
 
 function closeDetail() {
+  openItemId = null;
   $('#detail-panel').hidden = true;
 }
 
 function shareItem(id) {
   const item = byItem(id);
-  const available = fields.filter(field => !item.fields.includes(field.id));
-  showModal('Add to field', available.length ? `<form id="share-form"><label class="form-label" for="share-field">Field</label><select class="input" id="share-field">${available.map(field => `<option value="${field.id}">${escapeHTML(fieldPath(field.id))}</option>`).join('')}</select><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Add</button></div></form>` : '<div class="blank-message">Already in all fields</div>');
-  if (available.length) $('#share-form').onsubmit = event => {
+  showModal('Fields', `<form id="membership-form"><div class="membership-options">${fields.map(field => `<label class="membership-option" style="--field-color:${field.color}"><input type="checkbox" name="field" value="${field.id}" ${item.fields.includes(field.id) ? 'checked' : ''}><span class="field-dot"></span><span>${escapeHTML(fieldPath(field.id))}</span></label>`).join('')}</div><p class="form-error" id="membership-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Save</button></div></form>`);
+  $('#membership-form').onsubmit = async event => {
     event.preventDefault();
-    item.fields.push($('#share-field').value);
-    closeModal();
-    render();
-    openItem(id);
+    if (isSaving) return;
+    const selected = [...event.currentTarget.querySelectorAll('input:checked')].map(input => input.value);
+    try {
+      await saveMutation(model => model.setMemberships(id, selected), event.currentTarget);
+      closeModal();
+      render();
+      openItem(id);
+    } catch (error) {
+      $('#membership-error').textContent = saveError(error);
+    }
   };
+}
+
+function addExisting() {
+  const target = currentField;
+  const available = items.filter(item => !item.fields.includes(target));
+  showModal('Add existing item', `<input class="input search-input" id="existing-query" placeholder="Search items" aria-label="Search existing items"><div class="search-results" id="existing-results"></div><p class="form-error" id="existing-error" role="alert"></p>`);
+  const update = () => {
+    const query = $('#existing-query').value.trim().toLowerCase();
+    const visible = available.filter(item => [item.title, item.body, item.url, item.path].some(text => text?.toLowerCase().includes(query)));
+    $('#existing-results').innerHTML = visible.map(item => `<button class="search-result" data-existing-item="${item.id}">${icon(kinds[item.kind].icon)}<div><strong>${escapeHTML(item.title)}</strong><small>${typeName(item.kind)}</small></div></button>`).join('') || '<div class="search-empty">No items available</div>';
+    document.querySelectorAll('[data-existing-item]').forEach(node => node.onclick = async () => {
+      if (isSaving) return;
+      try {
+        await saveMutation(model => {
+          const item = model.items.find(candidate => candidate.id === node.dataset.existingItem);
+          model.setMemberships(item.id, [...item.fields, target]);
+        });
+        closeModal();
+        render();
+        openItem(node.dataset.existingItem);
+      } catch (error) {
+        $('#existing-error').textContent = saveError(error);
+      }
+    });
+  };
+  $('#existing-query').oninput = update;
+  update();
 }
 
 function newConnection() {
@@ -376,19 +648,24 @@ function newConnection() {
   const source = currentField || fields[0].id;
   const target = fields.find(field => field.id !== source).id;
   showModal('Connect fields', `<form id="connection-form"><label class="form-label" for="connection-from">From</label><select class="input" id="connection-from">${fieldOptions(source)}</select><label class="form-label" for="connection-to">To</label><select class="input" id="connection-to">${fieldOptions(target)}</select><label class="form-label" for="connection-label">Label</label><input class="input" id="connection-label" maxlength="64" required><label class="form-label" for="connection-note">Note <span class="optional">optional</span></label><textarea class="input short-note" id="connection-note"></textarea><p id="connection-error" class="form-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Connect</button></div></form>`);
-  $('#connection-form').onsubmit = event => {
+  $('#connection-form').onsubmit = async event => {
     event.preventDefault();
+    if (isSaving) return;
     const from = $('#connection-from').value;
     const to = $('#connection-to').value;
     if (from === to) { $('#connection-error').textContent = 'Choose two different fields.'; return; }
     const label = $('#connection-label').value.trim();
     if (!label) return;
     const edge = { id: uid('connection'), from, to, kind: 'related', label, note: $('#connection-note').value.trim() };
-    connections.push(edge);
-    selectedEdge = edge.id;
-    closeModal();
-    everythingMode = 'map';
-    navigate('everything');
+    try {
+      await saveMutation(model => model.createConnection(edge), event.currentTarget);
+      selectedEdge = edge.id;
+      closeModal();
+      everythingMode = 'map';
+      navigate('everything');
+    } catch (error) {
+      $('#connection-error').textContent = saveError(error);
+    }
   };
 }
 
@@ -404,10 +681,12 @@ function search() {
 }
 
 function library() {
-  showModal('Library', `<div class="library-row"><span>Fields</span><span>${fields.length}</span></div>${Object.entries(kinds).map(([kind, meta]) => `<div class="library-row"><span>${meta.plural}</span><span>${items.filter(item => item.kind === kind).length}</span></div>`).join('')}<p class="library-status">Prototype · session only</p>`);
+  showModal('Library', `<div class="library-row"><span>Fields</span><span>${fields.length}</span></div>${Object.entries(kinds).map(([kind, meta]) => `<div class="library-row"><span>${meta.plural}</span><span>${items.filter(item => item.kind === kind).length}</span></div>`).join('')}<p class="library-status">Saved locally in this browser</p>`);
 }
 
 document.addEventListener('click', async event => {
+  if (event.target.closest('[data-action="reload-library"]')) { location.reload(); return; }
+  if (!isReady || isSaving || nativeBusy) return;
   const nav = event.target.closest('[data-view]');
   if (nav) navigate(nav.dataset.view);
   const node = event.target.closest('[data-action]');
@@ -431,8 +710,19 @@ document.addEventListener('click', async event => {
         compose(node.dataset.kind);
         break;
       case 'edit-item': compose(byItem(id).kind, id); break;
+      case 'relink-file': compose('file', id, Boolean(byItem(id).native || native.available)); break;
+      case 'open-native-file':
+        nativeBusy = true;
+        try { await native.open(byItem(id).native.referenceId); }
+        catch (error) { toast(error.message); }
+        finally { nativeBusy = false; renderFileChanges(); syncFileReferences(true); }
+        break;
       case 'open-item': openItem(id); break;
       case 'share-item': shareItem(id); break;
+      case 'add-existing':
+        $('#add-menu').hidden = true;
+        addExisting();
+        break;
       case 'copy-path':
         try { await navigator.clipboard.writeText(byItem(id).path); toast('Path copied'); }
         catch { toast('Clipboard unavailable'); }
@@ -487,20 +777,23 @@ document.addEventListener('pointerdown', event => {
   document.addEventListener('pointercancel', stop);
 });
 
-$('.brand').onclick = event => { event.preventDefault(); navigate('fields'); };
-$('#search-button').onclick = search;
-$('#settings').onclick = library;
+$('.brand').onclick = event => { event.preventDefault(); if (isReady && !isSaving && !nativeBusy) navigate('everything'); };
+$('#search-button').onclick = () => { if (isReady && !isSaving && !nativeBusy) search(); };
+$('#settings').onclick = () => { if (isReady && !isSaving && !nativeBusy) library(); };
+$('#modal').addEventListener('cancel', event => { if (isSaving || nativeBusy) event.preventDefault(); });
 $('#modal').addEventListener('close', () => {
   drawingPad?.destroy();
   drawingPad = null;
   if (returnFocus?.isConnected) returnFocus.focus();
+  if (isReady && !isSaving && !nativeBusy) { renderFileChanges(); syncFileReferences(true); }
 });
 $('#modal').addEventListener('click', event => {
-  if (event.target !== $('#modal')) return;
+  if (event.target !== $('#modal') || isSaving || nativeBusy) return;
   const bounds = $('#modal').getBoundingClientRect();
   if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeModal();
 });
 document.addEventListener('keydown', event => {
+  if (!isReady || isSaving || nativeBusy) return;
   if (event.key === 'Escape') {
     if (!$('#modal').open) closeDetail();
     const menu = $('#add-menu');
@@ -513,3 +806,4 @@ document.addEventListener('keydown', event => {
 });
 document.querySelectorAll('[data-icon]').forEach(node => { node.innerHTML = icon(node.dataset.icon); });
 render();
+initializeLibrary();
