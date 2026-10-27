@@ -1,97 +1,515 @@
-const icons={search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>',grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',orbit:'<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-35 12 12)"/><path d="M7 4c6-1 12 10 9 16"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>',sliders:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="white"/><circle cx="15" cy="17" r="2" fill="white"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 2-2.5 2-2.5 4M12 17h.01"/>',folder:'<path d="M3 7V5h7l2 3h9v12H3V7Z"/>',link:'<path d="m9 15 6-6M8 17l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 7l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0" transform="translate(1 0) scale(.9)"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',file:'<path d="M5 3h9l5 5v13H5Z M14 3v6h5"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',check:'<path d="m5 12 4 4L19 6"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',external:'<path d="M13 4h7v7M20 4 10 14M10 5H4v15h15v-6"/>',branch:'<path d="M6 3v12a4 4 0 0 0 4 4h8M6 8h12M15 5l3 3-3 3M15 16l3 3-3 3"/>'};
-const icon=n=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[n]||icons.folder}</svg>`;
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const root='C:\\Users\\You\\';
-const fields=[
- {id:'music',name:'Music',desc:'',art:'music',color:'#a0b786',type:'Artifacts',parent:null,path:root+'Music',x:75,y:65},
- {id:'cinema',name:'Cinema',desc:'',art:'cinema',color:'#c2ad91',type:'Artifacts',parent:null,path:root+'Videos\\Films',x:445,y:65},
- {id:'books',name:'Books',desc:'',art:'books',color:'#b4a184',type:'Artifacts',parent:null,path:root+'Documents\\Books',x:755,y:222},
- {id:'design',name:'Design',desc:'',art:'design',color:'#d4a187',type:'Artifacts',parent:null,path:root+'Pictures\\Design',x:75,y:390},
- {id:'people',name:'People',desc:'',art:'people',color:'#8eada0',type:'Individuals',parent:null,path:root+'Documents\\People',x:445,y:390},
- {id:'cars',name:'Cars',desc:'',art:'cars',color:'#a5b0a0',type:'Artifacts',parent:null,path:root+'Pictures\\Cars',x:755,y:450},
- {id:'scores',name:'Film scores',desc:'',art:'music',color:'#a0b786',type:'Artifacts',parent:'music',path:root+'Music\\Film scores'},
- {id:'ambient',name:'Ambient',desc:'',art:'music',color:'#b7c7a0',type:'Artifacts',parent:'music',path:root+'Music\\Ambient'},
- {id:'scifi',name:'Science fiction',desc:'',art:'cinema',color:'#c2ad91',type:'Artifacts',parent:'cinema',path:root+'Videos\\Films\\Science fiction'},
- {id:'fiction',name:'Speculative fiction',desc:'',art:'books',color:'#b4a184',type:'Artifacts',parent:'books',path:root+'Documents\\Books\\Fiction'},
- {id:'industrial',name:'Industrial design',desc:'',art:'design',color:'#d4a187',type:'Artifacts',parent:'design',path:root+'Pictures\\Design\\Objects'},
- {id:'zimmer',name:'Hans Zimmer',desc:'',art:'people',color:'#8eada0',type:'Individuals',parent:'people',path:root+'Documents\\People\\Hans Zimmer'}
-];
-const items=[
- {id:'ost',name:'Blade Runner 2049 — OST',ext:'FLAC',author:'Hans Zimmer & Benjamin Wallfisch',fields:['scores','cinema','zimmer'],path:root+'Music\\Film scores\\Blade Runner 2049.flac',color:'#c3cdb9',mark:'2049',notes:''},
- {id:'film',name:'Blade Runner 2049',ext:'MKV',author:'Denis Villeneuve · 2017',fields:['scifi'],path:root+'Videos\\Films\\Science fiction\\Blade Runner 2049.mkv',color:'#c1b8a7',mark:'2049',notes:''},
- {id:'androids',name:'Do Androids Dream of Electric Sheep?',ext:'EPUB',author:'Philip K. Dick · 1968',fields:['fiction','scifi'],path:root+'Documents\\Books\\Fiction\\Do Androids Dream.epub',color:'#dad7c4',mark:'?',notes:''},
- {id:'interstellar',name:'Interstellar — OST',ext:'FLAC',author:'Hans Zimmer · 2014',fields:['scores','cinema','zimmer'],path:root+'Music\\Film scores\\Interstellar.flac',color:'#c1cbbc',mark:'∞',notes:''},
- {id:'eno',name:'Music for Airports',ext:'FLAC',author:'Brian Eno · 1978',fields:['ambient'],path:root+'Music\\Ambient\\Music for Airports.flac',color:'#d7dac8',mark:'1/1',notes:''},
- {id:'rams',name:'Ten principles for good design',ext:'PDF',author:'Dieter Rams',fields:['industrial','people'],path:root+'Pictures\\Design\\Objects\\Ten principles.pdf',color:'#d8cfbc',mark:'10',notes:''},
- {id:'braun',name:'Braun SK 4',ext:'JPG',author:'Dieter Rams & Hans Gugelot · 1956',fields:['industrial','music'],path:root+'Pictures\\Design\\Objects\\Braun SK4.jpg',color:'#d0d2c3',mark:'SK 4',notes:''},
- {id:'911',name:'Porsche 911 — 1964',ext:'JPG',author:'Ferdinand Alexander Porsche',fields:['cars','design'],path:root+'Pictures\\Cars\\Porsche 911.jpg',color:'#c9d0c6',mark:'911',notes:''},
- {id:'zimmernote',name:'Hans Zimmer — notes',ext:'MD',author:'Personal notes',fields:['zimmer'],path:root+'Documents\\People\\Hans Zimmer\\Notes.md',color:'#d1dcd2',mark:'HZ',notes:''},
- {id:'dune',name:'Dune',ext:'EPUB',author:'Frank Herbert · 1965',fields:['fiction','scifi'],path:root+'Documents\\Books\\Fiction\\Dune.epub',color:'#d9c5a4',mark:'D',notes:''}
-];
-const links=[
- {id:'sound',from:'music',to:'cinema',label:'Soundtracks',kind:'shared',files:['ost','interstellar'],desc:'',lx:354,ly:127},
- {id:'adapt',from:'cinema',to:'books',label:'Adaptations',kind:'shared',files:['androids','dune'],desc:'',lx:702,ly:192},
- {id:'objects',from:'music',to:'design',label:'Audio equipment',kind:'shared',files:['braun'],desc:'',lx:168,ly:302},
- {id:'composer',from:'music',to:'people',label:'Composers',kind:'shared',files:['ost','interstellar'],desc:'',lx:346,ly:285},
- {id:'ramslink',from:'design',to:'people',label:'Dieter Rams',kind:'shared',files:['rams'],desc:'',lx:355,ly:461},
- {id:'form',from:'design',to:'cars',label:'Automotive design',kind:'shared',files:['911'],desc:'',lx:597,ly:574},
- {id:'screencomposer',from:'cinema',to:'people',label:'Film composers',kind:'shared',files:['ost','interstellar'],desc:'',lx:541,ly:304},
- {id:'inspired',from:'books',to:'people',label:'Influences',kind:'related',files:[],desc:'',lx:713,ly:397}
-];
-let view='everything',current=null,filter='all',layout='grid',sort='curated',selectedLink='sound',mapMode='all',favorites=new Set(['ost','rams','music']),zoom=1,dragged=false;
-const content=document.querySelector('#content'),modal=document.querySelector('#modal');
-function hydrateIcons(el=document){el.querySelectorAll('[data-icon]').forEach(e=>e.innerHTML=icon(e.dataset.icon))}
-function field(id){return fields.find(f=>f.id===id)}
-function descendants(id){return [id,...fields.filter(f=>f.parent===id).flatMap(f=>descendants(f.id))]}
-function filesFor(id){let ids=new Set(descendants(id));return items.filter(i=>i.fields.some(f=>ids.has(f)))}
-function ancestors(id){let chain=[],f=field(id);while(f){chain.unshift(f);f=field(f.parent)}return chain}
-function primary(id){let f=field(id);while(f?.parent)f=field(f.parent);return f}
-function hasItem(f,i){return i.fields.some(id=>descendants(f.id).includes(id))}
-function art(f){return `<div class="art ${esc(f.art)}" style="--cover-color:${esc(f.color)}">${({music:'<div class="sleeve"></div><div class="record"></div>',cinema:'<div class="filmframe back"></div><div class="filmframe"></div>',design:'<div class="circle"></div><div class="square"></div><div class="stripe"></div>',books:'<div class="book"></div><div class="book two"></div>',people:'<div class="portrait"></div>',cars:'<svg viewBox="0 0 240 100"><path d="M13 62 27 53 72 47 95 23Q127 11 157 30l28 23 31 7 9 14H12ZM72 47h111M98 25l-12 23h73l-12-22M22 60h23m149 0h16"/><circle cx="58" cy="73" r="15"/><circle cx="182" cy="73" r="15"/><circle cx="58" cy="73" r="8"/><circle cx="182" cy="73" r="8"/></svg>'}[f.art]||`<div class="custom-mark">${esc(f.name.charAt(0))}</div>`)}</div>`}
-function navigate(next,id=null){view=next;current=id;closeDetail();render()}
-function render(){
- document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
- document.querySelector('#nav-count').textContent=fields.filter(f=>!f.parent).length;
- document.querySelector('#field-nav').innerHTML=fields.filter(f=>!f.parent).map(f=>`<button data-open-field="${f.id}"><span class="field-dot" style="background:${f.color}"></span>${esc(f.name)}<span class="chevron">›</span></button>`).join('');
- document.querySelector('#breadcrumb').innerHTML=current?`<button data-go="fields">Fields</button><span>/</span>${ancestors(current).map((f,i,fs)=>i===fs.length-1?esc(f.name):`<button data-open-field="${f.id}">${esc(f.name)}</button><span>/</span>`).join('')}`:({fields:'Fields',everything:'The big FIELD',recent:'Recently added',starred:'Favorites'}[view]);
- content.innerHTML=view==='everything'?mapView():view==='field'?fieldView():view==='fields'?fieldsView():collectionView();
- hydrateIcons();bindContent();if(view==='everything')initMap();
+'use strict';
+
+// Prototype state. There is no seeded content or filesystem indexing.
+const fields = [];
+const items = [];
+const connections = [];
+const attachments = new Map();
+const positions = new Map();
+const colors = ['#6384ff', '#80bca3', '#c0a17d', '#ad91cd', '#d28c8c'];
+const kinds = {
+  link: { label: 'Link', plural: 'Links', icon: 'link' },
+  file: { label: 'File', plural: 'Files', icon: 'file' },
+  note: { label: 'Note', plural: 'Notes', icon: 'note' },
+  drawing: { label: 'Drawing', plural: 'Drawings', icon: 'pen' }
+};
+const paths = {
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  orbit: '<circle cx="12" cy="12" r="3"/><ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-35 12 12)"/><path d="M7 4c6-1 12 10 9 16"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+  folder: '<path d="M3 7V5h7l2 3h9v12H3V7Z"/>',
+  file: '<path d="M5 3h9l5 5v13H5Z M14 3v6h5"/>',
+  note: '<path d="M5 3h14v18H5ZM8 8h8M8 12h8M8 16h5"/>',
+  pen: '<path d="m14 4 6 6M4 20l5-1L21 7l-4-4L5 15l-1 5Z"/>',
+  link: '<path d="m9 15 6-6M8 17l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 7l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0" transform="translate(1 0) scale(.9)"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+  down: '<path d="m7 10 5 5 5-5"/>',
+  external: '<path d="M13 4h7v7M20 4 10 14M10 5H4v15h15v-6"/>',
+  settings: '<path d="m9 3-1 3-3 1-2 3 2 3v4l3 2 3-1 3 1 3-2v-4l2-3-2-3-3-1-1-3Z"/><circle cx="11" cy="11" r="3"/>',
+  subfield: '<path d="M5 3v12a4 4 0 0 0 4 4h10M15 15l4 4-4 4M10 6h9M14.5 1.5v9"/>',
+  copy: '<rect x="8" y="8" width="12" height="13" rx="1"/><path d="M16 8V3H3v13h5"/>',
+  undo: '<path d="M8 5 3 10l5 5M3 10h10a6 6 0 0 1 0 12"/>',
+  trash: '<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>'
+};
+
+const $ = selector => document.querySelector(selector);
+const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.file}</svg>`;
+const uid = prefix => `${prefix}-${crypto.randomUUID()}`;
+const byField = id => fields.find(field => field.id === id);
+const byItem = id => items.find(item => item.id === id);
+const typeName = kind => kinds[kind].label;
+let view = 'fields';
+let currentField = null;
+let itemFilter = 'all';
+let everythingMode = 'map';
+let selectedEdge = null;
+let mapObserver = null;
+let mapSize = { width: 600, height: 400 };
+let zoom = 1;
+let dragged = false;
+let drawingPad = null;
+let returnFocus = null;
+
+function ancestry(id) {
+  const result = [];
+  for (let field = byField(id); field; field = byField(field.parent)) result.unshift(field);
+  return result;
 }
-function heading(title,actions=''){return `<div class="heading-row"><h1>${title}</h1>${actions}</div>`}
-function stats(){return `<div class="stats"><div class="stat"><strong>${fields.filter(f=>!f.parent).length}</strong> primary fields</div><div class="stat"><strong>${fields.filter(f=>f.parent).length}</strong> subfields</div><div class="stat"><strong>${items.length}</strong> original files</div><div class="stat"><strong>${links.length}</strong> connections</div></div>`}
-const footer=()=>'';
-function card(f){return `<article class="field-card"><button class="cover" data-open-field="${f.id}" aria-label="Open ${esc(f.name)}">${art(f)}</button><div class="field-card-info"><div class="card-head"><button data-open-field="${f.id}"><h2>${esc(f.name)}</h2></button><span class="arrow">↗</span></div><div class="card-bottom">${icon('folder')}<span>${fields.filter(s=>s.parent===f.id).length} subfields</span><span>·</span><span>${filesFor(f.id).length} files</span><span class="card-type">${esc(f.type.toUpperCase())}</span></div></div></article>`}
-function fieldsView(){let fs=fields.filter(f=>!f.parent&&(filter==='all'||f.type.toLowerCase()===filter));if(sort==='name')fs.sort((a,b)=>a.name.localeCompare(b.name));return heading('Fields',`<button class="primary-button" data-add-field=""><span class="plus">+</span> New field</button>`)+stats()+`<div class="view-toolbar"><div class="filters">${['all','artifacts','individuals'].map(x=>`<button class="filter ${filter===x?'active':''}" data-filter="${x}">${x==='all'?'All fields':x.charAt(0).toUpperCase()+x.slice(1)}</button>`).join('')}</div><div class="toolbar-right"><select class="sort-select" id="sort" aria-label="Sort fields"><option value="curated" ${sort==='curated'?'selected':''}>Custom order</option><option value="name" ${sort==='name'?'selected':''}>Name A–Z</option></select><div class="view-switch"><button data-layout="grid" class="${layout==='grid'?'active':''}" aria-label="Grid view">${icon('grid')}</button><button data-layout="list" class="${layout==='list'?'active':''}" aria-label="List view">${icon('list')}</button></div></div></div><div class="field-grid ${layout==='list'?'list':''}">${fs.map(card).join('')}</div>`+footer()}
-function mapView(){return heading('The big FIELD',`<button class="primary-button" id="connect-fields">${icon('link')} Connect fields</button>`)+stats()+`<div class="view-toolbar"><div class="filters">${[['all','All connections'],['shared','Shared files'],['related','Your connections']].map(([v,l])=>`<button class="filter ${mapMode===v?'active':''}" data-map-mode="${v}">${l}</button>`).join('')}</div></div><div class="map-workspace"><div class="graph-shell" id="graph-shell"><div class="graph-stage" id="graph-stage"><svg viewBox="0 0 1020 650" class="map-lines" id="map-lines" aria-hidden="true"></svg><div id="map-nodes"></div><div id="map-labels"></div></div><div class="graph-legend"><span><i></i> Shared files</span><span><i class="dashed"></i> Personal connection</span></div><div class="graph-controls"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-reset" aria-label="Fit map">${icon('grid')}</button><button id="zoom-in" aria-label="Zoom in">+</button></div></div><div class="map-inspector" id="map-inspector">${linkInspector(links.find(l=>l.id===selectedLink)||links[0])}</div></div>`+footer()}
-function linkInspector(l){return `<div class="connection-route"><span style="background:${field(l.from).color}"></span>${esc(field(l.from).name)} <b>↔</b> <span style="background:${field(l.to).color}"></span>${esc(field(l.to).name)}</div><h2>${esc(l.label)}</h2>${l.kind==='related'&&l.desc?`<p>${esc(l.desc)}</p>`:''}<div class="inspector-divider"></div><div class="inspector-section">${l.kind==='shared'?'SHARED FILES':'CONNECTION'}${l.files.length?`<span>${l.files.length}</span>`:''}</div>${l.files.map(id=>{const i=items.find(i=>i.id===id);return `<button class="shared-file" data-item="${i.id}"><div class="file-thumb" style="background:${i.color}">${esc(i.mark)}</div><div><strong>${esc(i.name)}</strong><small>${esc(i.ext)}</small></div><span>↗</span></button>`}).join('')}<button class="inspector-open" data-open-field="${l.from}">Open ${esc(field(l.from).name)} ${icon('arrow')}</button>`}
-let compactMap=false;
-const compactNodes={music:[40,60],cinema:[355,60],books:[355,305],design:[40,305],people:[40,550],cars:[355,550]};
-const compactLabels={sound:[292,128],adapt:[449,270],objects:[134,270],composer:[134,516],ramslink:[292,439],form:[449,516],inspired:[293,575],screencomposer:[293,365]};
-function mapPosition(f){let pos=compactNodes[f.id]||[195,305];return compactMap?{x:f.cx??pos[0],y:f.cy??pos[1]}:{x:f.x??430,y:f.y??250}}
-function labelPosition(l){let pos=compactLabels[l.id]||[293,365];return compactMap?{x:pos[0]+(l.cdx||0),y:pos[1]+(l.cdy||0)}:{x:l.lx??450,y:l.ly??290}}
-function edgeMarkup(l){const a=mapPosition(field(l.from)),b=mapPosition(field(l.to)),ax=a.x+94,ay=a.y+80,bx=b.x+94,by=b.y+80;return `<path class="map-edge ${l.kind==='related'?'dashed':''} ${l.id===selectedLink?'selected':''}" d="M ${ax} ${ay} Q ${(ax+bx)/2+(Math.abs(ax-bx)<50?70:0)} ${(ay+by)/2-40} ${bx} ${by}"/>`}
-function drawMap(){let roots=fields.filter(f=>!f.parent);document.querySelector('#map-nodes').innerHTML=roots.map(f=>{const pos=mapPosition(f);return `<div class="map-node" data-map-field="${f.id}" style="left:${pos.x}px;top:${pos.y}px"><div class="node-cover">${art(f)}<button data-map-inspect="${f.id}" class="node-open" aria-label="Open ${esc(f.name)}">↗</button></div><button class="node-info" data-map-inspect="${f.id}"><span class="field-dot" style="background:${f.color}"></span><strong>${esc(f.name)}</strong><small>${filesFor(f.id).length} ${filesFor(f.id).length===1?'file':'files'}</small></button><div class="node-port"></div></div>`}).join('');
- let visible=links.filter(l=>mapMode==='all'||l.kind===mapMode);document.querySelector('#map-lines').innerHTML=visible.map(edgeMarkup).join('');
- document.querySelector('#map-labels').innerHTML=visible.map(l=>{const pos=labelPosition(l);return `<button class="map-edge-label ${l.id===selectedLink?'selected':''} ${l.kind==='related'?'related':''}" data-link="${l.id}" style="left:${pos.x}px;top:${pos.y}px">${icon(l.kind==='shared'?'link':'branch')}${esc(l.label)}${l.files.length?`<span>${l.files.length}</span>`:''}</button>`}).join('');bindMapEvents();}
-let mapResizeObserver;
-function initMap(){mapResizeObserver?.disconnect();compactMap=document.querySelector('#graph-shell').clientWidth<600;drawMap();fitMap();mapResizeObserver=new ResizeObserver(fitMap);mapResizeObserver.observe(document.querySelector('#graph-shell'));document.querySelector('#zoom-in').onclick=()=>{zoom=Math.min(1.6,zoom+.15);fitMap()};document.querySelector('#zoom-out').onclick=()=>{zoom=Math.max(.55,zoom-.15);fitMap()};document.querySelector('#zoom-reset').onclick=()=>{zoom=1;fitMap()};}
-function fitMap(){let shell=document.querySelector('#graph-shell'),stage=document.querySelector('#graph-stage');if(!shell||!stage)return;const compact=shell.clientWidth<600;if(compact!==compactMap){compactMap=compact;drawMap()}const w=compactMap?630:1020,h=compactMap?760:650;shell.style.height=compactMap?Math.max(440,shell.clientWidth*760/630+60)+'px':'';stage.style.width=w+'px';stage.style.height=h+'px';document.querySelector('#map-lines').setAttribute('viewBox',`0 0 ${w} ${h}`);let scale=Math.min(shell.clientWidth/w,(shell.clientHeight-55)/h)*zoom;stage.style.transform=`translate(-50%,-50%) scale(${scale})`;stage.dataset.scale=scale}
-function bindMapEvents(){document.querySelectorAll('[data-link]').forEach(b=>b.onclick=()=>{selectedLink=b.dataset.link;document.querySelector('#map-inspector').innerHTML=linkInspector(links.find(l=>l.id===selectedLink));hydrateIcons();drawMap();bindItemButtons()});document.querySelectorAll('[data-map-inspect]').forEach(b=>b.onclick=()=>{if(!dragged)navigate('field',b.dataset.mapInspect)});document.querySelectorAll('.map-node').forEach(n=>n.onpointerdown=e=>{if(e.button!==0)return;const f=field(n.dataset.mapField),sx=e.clientX,sy=e.clientY,origin=mapPosition(f),scale=Number(document.querySelector('#graph-stage').dataset.scale),originalLabels=links.filter(l=>l.from===f.id||l.to===f.id).map(l=>({l,pos:labelPosition(l),cdx:l.cdx||0,cdy:l.cdy||0}));dragged=false;function move(ev){let dx=(ev.clientX-sx)/scale,dy=(ev.clientY-sy)/scale;if(Math.abs(dx)+Math.abs(dy)>6)dragged=true;if(dragged){let x=Math.max(0,Math.min(compactMap?440:830,origin.x+dx)),y=Math.max(35,Math.min(compactMap?590:495,origin.y+dy));if(compactMap){f.cx=x;f.cy=y}else{f.x=x;f.y=y}n.style.left=x+'px';n.style.top=y+'px';for(const {l,pos,cdx,cdy} of originalLabels){if(compactMap){l.cdx=cdx+(x-origin.x)/2;l.cdy=cdy+(y-origin.y)/2}else{l.lx=pos.x+(x-origin.x)/2;l.ly=pos.y+(y-origin.y)/2}const label=document.querySelector(`[data-link="${l.id}"]`),p=labelPosition(l);if(label){label.style.left=p.x+'px';label.style.top=p.y+'px'}}document.querySelector('#map-lines').innerHTML=links.filter(l=>mapMode==='all'||l.kind===mapMode).map(edgeMarkup).join('')}}function up(){document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);setTimeout(()=>dragged=false,100)}document.addEventListener('pointermove',move);document.addEventListener('pointerup',up)});}
-function itemCard(i){return `<button class="artifact-card" data-item="${i.id}"><div class="artifact-art" style="background:${i.color}"><span>${esc(i.mark)}</span><span class="extension">${esc(i.ext)}</span>${i.fields.length>1?`<span class="shared-badge">${icon('link')} ${i.fields.length} fields</span>`:''}</div><div class="artifact-info"><strong>${esc(i.name)}</strong><small>${esc(i.author)}</small></div></button>`}
-function fieldView(){let f=field(current),children=fields.filter(s=>s.parent===f.id),files=filesFor(f.id);let ps=primary(f.id);let ls=links.filter(l=>(l.from===ps.id||l.to===ps.id)&&(!f.parent||l.files.some(id=>files.some(i=>i.id===id))));return heading(esc(f.name),`<div class="field-title-actions"><button class="secondary-button" data-add-field="${f.id}"><span>+</span> Subfield</button><button class="primary-button" id="map-files">${icon('link')} Map files</button></div>`)+`<div class="source-strip">${icon('folder')}<span>${esc(f.path)}</span></div><div class="field-metrics"><span><b>${files.length}</b> referenced files</span><span><b>${children.length}</b> subfields</span><span><b>${ls.length}</b> connections</span><button class="star-field ${favorites.has(f.id)?'favorited':''}" data-favorite="${f.id}">${icon('star')} ${favorites.has(f.id)?'Favorited':'Favorite field'}</button></div>${children.length?`<div class="section-title"><h2>Within this field</h2></div><div class="subfield-grid">${children.map(c=>`<button class="subfield-tile" data-open-field="${c.id}"><span class="subfield-dot" style="background:${c.color}">${icon('folder')}</span><div><strong>${esc(c.name)}</strong><small>${filesFor(c.id).length} files · ${esc(c.type)}</small></div><span>↗</span></button>`).join('')}</div>`:''}<div class="section-title"><h2>Files <span> / ${String(files.length).padStart(2,'0')}</span></h2></div>${files.length?`<div class="artifact-grid">${files.map(itemCard).join('')}</div>`:`<div class="empty"><h2>No files</h2><button class="secondary-button" id="empty-map">Map file</button></div>`}<div class="section-title"><h2>Connections</h2><button class="text-link" id="field-connect">+ Connect fields</button></div><div class="connections-row">${ls.map(l=>{let other=field(l.from===ps.id?l.to:l.from);return `<button class="connection-pill" data-jump-link="${l.id}"><span class="field-dot" style="background:${other.color}"></span>${esc(other.name)}<small>${esc(l.label)}</small>${icon('arrow')}</button>`}).join('')||'<span class="muted-copy">No connections</span>'}</div>`+footer()}
-function collectionView(){let star=view==='starred';let list=star?items.filter(i=>favorites.has(i.id)):[...items].reverse();let fs=star?fields.filter(f=>favorites.has(f.id)):[];return heading(star?'Favorites':'Recently added')+`<div class="section-title"><h2>${star?'Fields':'Files'}</h2></div>${fs.length?`<div class="subfield-grid">${fs.map(f=>`<button class="subfield-tile" data-open-field="${f.id}"><span class="subfield-dot" style="background:${f.color}">${icon('folder')}</span><div><strong>${esc(f.name)}</strong><small>${filesFor(f.id).length} referenced files</small></div><span>↗</span></button>`).join('')}</div>`:''}<div class="section-title"><h2>${star?'Files':'Files'}</h2><span>${list.length} files</span></div><div class="artifact-grid">${list.map(itemCard).join('')}</div>${!list.length?'<div class="empty">No favorites</div>':''}`+footer()}
-function bindContent(){document.querySelectorAll('[data-open-field]').forEach(b=>b.onclick=()=>navigate('field',b.dataset.openField));document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));document.querySelectorAll('[data-add-field]').forEach(b=>b.onclick=()=>newField(b.dataset.addField||null));document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;render()});document.querySelectorAll('[data-layout]').forEach(b=>b.onclick=()=>{layout=b.dataset.layout;render()});document.querySelectorAll('[data-map-mode]').forEach(b=>b.onclick=()=>{mapMode=b.dataset.mapMode;render()});document.querySelectorAll('[data-favorite]').forEach(b=>b.onclick=()=>{toggleFavorite(b.dataset.favorite);render()});document.querySelectorAll('[data-jump-link]').forEach(b=>b.onclick=()=>{selectedLink=b.dataset.jumpLink;mapMode='all';navigate('everything')});if(document.querySelector('#sort'))document.querySelector('#sort').onchange=e=>{sort=e.target.value;render()};['connect-fields','field-connect'].forEach(id=>{if(document.getElementById(id))document.getElementById(id).onclick=connectFields});['map-files','empty-map'].forEach(id=>{if(document.getElementById(id))document.getElementById(id).onclick=mapFiles});bindItemButtons();}
-function bindItemButtons(){document.querySelectorAll('[data-item]').forEach(b=>b.onclick=()=>openItem(b.dataset.item));document.querySelectorAll('[data-open-field]').forEach(b=>b.onclick=()=>navigate('field',b.dataset.openField))}
-function showModal(title,body){document.querySelector('#modal-content').innerHTML=`<div class="modal-head"><h2>${title}</h2><button class="close-button" id="close-modal" aria-label="Close dialog">×</button></div><div class="modal-body">${body}</div>`;document.querySelector('#close-modal').onclick=()=>modal.close();if(!modal.open)modal.showModal();hydrateIcons(modal);modal.querySelector('input')?.focus()}
-function toast(message){const el=document.querySelector('#toast');el.textContent=message;el.classList.add('visible');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.classList.remove('visible'),3200)}
-function newField(parent=null){let color='#b5c99f';showModal(parent?'New subfield':'New field',`<form id="field-form"><label class="form-label" for="field-name">FIELD NAME</label><input id="field-name" class="text-input" placeholder="Name" maxlength="48" required><div class="form-row"><div><label class="form-label" for="field-kind">KIND</label><select id="field-kind" class="text-input"><option>Artifacts</option><option>Individuals</option></select></div><div><label class="form-label">FIELD COLOR</label><div class="swatches">${['#b5c99f','#c2ad91','#8eada0','#d4a187','#aaa2bd'].map((c,i)=>`<button type="button" class="swatch ${i===0?'selected':''}" data-color="${c}" style="--swatch:${c}" aria-label="Color ${i+1}"></button>`).join('')}</div></div></div><label class="form-label" for="field-path">SOURCE FOLDER <span class="optional">(OPTIONAL)</span></label><input id="field-path" class="text-input" placeholder="C:\\Users\\You\\…"><div class="form-actions"><button type="button" class="secondary-button" id="cancel-field">Cancel</button><button class="primary-button" type="submit">Create field <span class="plus">+</span></button></div></form>`);document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;document.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('selected',x===b))});document.querySelector('#cancel-field').onclick=()=>modal.close();document.querySelector('#field-form').onsubmit=e=>{e.preventDefault();let name=document.querySelector('#field-name').value.trim();if(!name)return;let id='field-'+Date.now();fields.push({id,name,desc:'',art:'custom',color,type:document.querySelector('#field-kind').value,parent,path:document.querySelector('#field-path').value.trim()||'No source folder mapped',x:430,y:240});modal.close();navigate('field',id);toast('Field created')};}
-function connectFields(){const roots=fields.filter(f=>!f.parent);showModal('New connection',`<form id="connection-form"><div class="form-row"><div><label class="form-label" for="link-from">FROM FIELD</label><select class="text-input" id="link-from">${roots.map(f=>`<option value="${f.id}" ${f.id===primary(current)?.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div><div><label class="form-label" for="link-to">TO FIELD</label><select class="text-input" id="link-to">${roots.map((f,i)=>`<option value="${f.id}" ${i===1?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div></div><label class="form-label" for="link-label">LABEL</label><input id="link-label" class="text-input" required maxlength="45" placeholder="Label"><label class="form-label" for="link-note">NOTE</label><textarea id="link-note" class="text-input" placeholder="Optional note"></textarea><div class="form-note" id="connection-error"></div><div class="form-actions"><button class="primary-button" type="submit">Connect ${icon('link')}</button></div></form>`);document.querySelector('#connection-form').onsubmit=e=>{e.preventDefault();const from=document.querySelector('#link-from').value,to=document.querySelector('#link-to').value;if(from===to){document.querySelector('#connection-error').textContent='Choose two different fields.';return}let label=document.querySelector('#link-label').value.trim();if(!label)return;let id='link-'+Date.now();let a=field(from),b=field(to);links.push({id,from,to,label,kind:'related',files:[],desc:document.querySelector('#link-note').value.trim()||'',lx:((a.x??430)+(b.x??430))/2+94,ly:((a.y??240)+(b.y??240))/2+58});selectedLink=id;mapMode='all';modal.close();navigate('everything');toast('Connection created')};}
-function mapFiles(){showModal('Map file',`<form id="map-form"><label class="form-label" for="map-select">FILE</label><select id="map-select" class="text-input">${items.map(i=>`<option value="${i.id}">${esc(i.name)} · ${i.ext}</option>`).join('')}</select><div class="demo-file-path" id="map-path"></div><label class="form-label" for="map-target">FIELD</label><select id="map-target" class="text-input">${fields.map(f=>`<option value="${f.id}" ${f.id===current?'selected':''}>${f.parent?'↳ ':''}${esc(f.name)}</option>`).join('')}</select><div class="form-actions"><button class="primary-button" type="submit">Map file ${icon('link')}</button></div></form>`);let select=document.querySelector('#map-select');const update=()=>document.querySelector('#map-path').textContent=items.find(i=>i.id===select.value).path;select.onchange=update;update();document.querySelector('#map-form').onsubmit=e=>{e.preventDefault();let i=items.find(i=>i.id===select.value),target=document.querySelector('#map-target').value;if(i.fields.includes(target)){toast('This file is already mapped to that field');return}i.fields.push(target);syncSharedLinks();modal.close();navigate('field',target);toast('File mapped')};}
-function syncSharedLinks(){let roots=fields.filter(f=>!f.parent);for(let a=0;a<roots.length;a++)for(let b=a+1;b<roots.length;b++){let shared=items.filter(i=>hasItem(roots[a],i)&&hasItem(roots[b],i));if(!shared.length)continue;let l=links.find(l=>l.kind==='shared'&&[l.from,l.to].includes(roots[a].id)&&[l.from,l.to].includes(roots[b].id));if(l)l.files=shared.map(i=>i.id);else links.push({id:'shared-'+Date.now()+'-'+a+'-'+b,from:roots[a].id,to:roots[b].id,label:'Shared files',kind:'shared',files:shared.map(i=>i.id),desc:'',lx:((roots[a].x??430)+(roots[b].x??430))/2+94,ly:((roots[a].y??250)+(roots[b].y??250))/2+60})}}
-function openItem(id){const i=items.find(i=>i.id===id),panel=document.querySelector('#detail-panel');panel.hidden=false;panel.innerHTML=`<div class="detail-head"><span>FILE</span><button class="close-button" id="close-detail" aria-label="Close file details">×</button></div><div class="detail-cover" style="background:${i.color}"><span>${esc(i.mark)}</span></div><h2>${esc(i.name)}</h2><div class="detail-meta">${esc(i.author)} <span>·</span> ${esc(i.ext)}</div><label class="form-label">LOCATION</label><div class="original-path">${icon('file')}<span>${esc(i.path)}</span></div><label class="form-label">APPEARS IN ${i.fields.length} FIELDS</label><div class="membership-list">${i.fields.map(id=>{let f=field(id),p=primary(id);return `<button data-open-field="${f.id}"><span class="field-dot" style="background:${f.color}"></span>${f.parent?esc(p.name)+' <span class="membership-sep">/</span> ':''}${esc(f.name)}<span>↗</span></button>`}).join('')}</div><div class="detail-actions"><button id="favorite-item" class="secondary-button ${favorites.has(i.id)?'favorited':''}">${icon('star')} ${favorites.has(i.id)?'Favorited':'Favorite'}</button><button id="reference-item" class="secondary-button">${icon('link')} Add to a field</button></div>`;document.querySelector('#close-detail').onclick=closeDetail;document.querySelector('#favorite-item').onclick=()=>{toggleFavorite(i.id);openItem(i.id)};document.querySelector('#reference-item').onclick=()=>{mapFiles();document.querySelector('#map-select').value=i.id;document.querySelector('#map-select').dispatchEvent(new Event('change'))};bindItemButtons();}
-function closeDetail(){document.querySelector('#detail-panel').hidden=true}
-function toggleFavorite(id){favorites.has(id)?favorites.delete(id):favorites.add(id)}
-function search(){showModal('Search',`<input id="search-query" class="text-input search-input" placeholder="Search fields, files, paths" aria-label="Search demo library"><div class="search-results" id="search-results"></div>`);const input=document.querySelector('#search-query');const update=()=>{const q=input.value.trim().toLowerCase();let fs=fields.filter(f=>`${f.name} ${f.path}`.toLowerCase().includes(q)),is=items.filter(i=>`${i.name} ${i.author} ${i.path}`.toLowerCase().includes(q));document.querySelector('#search-results').innerHTML=[...fs.map(f=>`<button class="result-row" data-search-field="${f.id}"><span class="result-icon" style="background:${f.color}">${esc(f.name[0])}</span><span><strong>${esc(f.name)}</strong><small>${f.parent?'Subfield':'Primary field'} · ${filesFor(f.id).length} files</small></span><span>↗</span></button>`),...is.map(i=>`<button class="result-row" data-search-item="${i.id}"><span class="result-icon" style="background:${i.color}">${icon('file')}</span><span><strong>${esc(i.name)}</strong><small>${esc(i.author)}</small></span><span>${i.ext}</span></button>`)].join('')||'<p>No results</p>';document.querySelectorAll('[data-search-field]').forEach(b=>b.onclick=()=>{modal.close();navigate('field',b.dataset.searchField)});document.querySelectorAll('[data-search-item]').forEach(b=>b.onclick=()=>{modal.close();openItem(b.dataset.searchItem)})};input.oninput=update;update()}
-function settings(){showModal('Library',`<div class="settings-action"><strong>Fields</strong><span>${fields.length}</span></div><div class="settings-action"><strong>Files</strong><span>${items.length}</span></div><div class="settings-action"><strong>Connections</strong><span>${links.length}</span></div><p>Demo data. Filesystem not connected. Changes reset on reload.</p>`)}
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>navigate(b.dataset.view));document.querySelector('.brand').onclick=e=>{e.preventDefault();navigate('fields')};document.querySelector('#sidebar-add').onclick=()=>newField();document.querySelector('#search-launch').onclick=search;document.querySelector('#settings').onclick=settings;document.querySelectorAll('#main-nav .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDetail()}if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();search()}});modal.addEventListener('click',e=>{if(e.target===modal){let r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close()}});render();
+
+function descendants(id) {
+  return [id, ...fields.filter(field => field.parent === id).flatMap(field => descendants(field.id))];
+}
+
+function itemsIn(id) {
+  const ids = new Set(descendants(id));
+  return items.filter(item => item.fields.some(fieldId => ids.has(fieldId)));
+}
+
+function fieldPath(id) {
+  return ancestry(id).map(field => field.name).join(' / ');
+}
+
+function formatSize(bytes = 0) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function button(label, action, className = 'secondary', attrs = '', glyph = '') {
+  return `<button class="button ${className}" data-action="${action}" ${attrs}>${glyph ? icon(glyph) : ''}${label}</button>`;
+}
+
+function heading(title, actions, count = null) {
+  return `<header class="page-header"><div class="page-title"><h1>${escapeHTML(title)}</h1>${count ? `<span class="page-count">${count}</span>` : ''}</div><div class="header-actions">${actions}</div></header>`;
+}
+
+function addMenu() {
+  return `<div class="add-menu-wrap">${button('Add', 'toggle-add', 'primary', 'aria-expanded="false" aria-controls="add-menu"', 'plus')}<div class="add-menu" id="add-menu" hidden>${Object.entries(kinds).map(([kind, meta]) => `<button data-action="add-item" data-kind="${kind}">${icon(meta.icon)}${meta.label}</button>`).join('')}</div></div>`;
+}
+
+function navigate(next, id = null) {
+  view = next;
+  currentField = id;
+  itemFilter = 'all';
+  closeDetail();
+  render();
+}
+
+function renderSidebar() {
+  document.querySelectorAll('[data-view]').forEach(node => node.classList.toggle('active', node.dataset.view === (view === 'field' ? 'fields' : view)));
+  $('#field-count').textContent = fields.length ? fields.filter(field => !field.parent).length : '';
+  const renderTree = (parent, depth = 0) => fields.filter(field => field.parent === parent).map(field => `<button data-action="open-field" data-id="${field.id}" class="${currentField === field.id ? 'current' : ''}" style="padding-left:${14 + depth * 13}px;--field-color:${field.color}"><span class="field-dot"></span><span class="nav-field-name">${escapeHTML(field.name)}</span></button>${renderTree(field.id, depth + 1)}`).join('');
+  $('#field-navigation').innerHTML = fields.length ? `<div class="section-label">Fields</div>${renderTree(null)}` : '';
+}
+
+function render() {
+  mapObserver?.disconnect();
+  renderSidebar();
+  $('#content').innerHTML = view === 'field' ? renderField() : view === 'everything' ? renderEverything() : renderFields();
+  if (view === 'everything' && everythingMode === 'map' && fields.length) initMap();
+}
+
+function renderFieldCard(field) {
+  const count = itemsIn(field.id).length;
+  return `<button class="field-card" data-action="open-field" data-id="${field.id}" style="--field-color:${field.color}">${icon('folder')}<div class="field-card-info"><strong>${escapeHTML(field.name)}</strong><small>${count} ${count === 1 ? 'item' : 'items'}</small></div></button>`;
+}
+
+function renderFields() {
+  const roots = fields.filter(field => !field.parent);
+  return heading('Fields', button('New field', 'new-field', 'primary', '', 'plus'), roots.length) + '<div class="rule"></div>' + (roots.length ? `<div class="field-grid">${roots.map(renderFieldCard).join('')}</div>` : '<div class="empty-state">No fields</div>');
+}
+
+function renderFilters() {
+  return `<div class="item-toolbar" aria-label="Filter items">${[['all', 'All'], ...Object.entries(kinds).map(([key, value]) => [key, value.plural])].map(([key, label]) => `<button class="filter-button ${itemFilter === key ? 'active' : ''}" data-action="filter" data-kind="${key}">${label}</button>`).join('')}</div>`;
+}
+
+function renderItem(item) {
+  const meta = kinds[item.kind];
+  const notePreview = item.kind === 'note' ? (item.body === item.title ? '' : item.body.startsWith(item.title + '\n') ? item.body.slice(item.title.length + 1) : item.body) : '';
+  const extra = item.kind === 'link' ? new URL(item.url).hostname : item.kind === 'file' ? (item.path || (item.fileName !== item.title ? item.fileName : '') || '') : '';
+  return `<button class="item-card" data-action="open-item" data-id="${item.id}">${item.kind === 'drawing' ? `<img class="drawing-preview" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : ''}<div class="item-card-top">${icon(meta.icon)}${meta.label}${item.fields.length > 1 ? `<span class="membership-count">${icon('link')}${item.fields.length}</span>` : ''}</div><h3>${escapeHTML(item.title)}</h3>${notePreview ? `<p>${escapeHTML(notePreview.slice(0, 350))}</p>` : extra ? `<small>${escapeHTML(extra)}</small>` : ''}${item.kind === 'file' && item.size !== undefined ? `<div class="item-card-bottom">${formatSize(item.size)}</div>` : ''}</button>`;
+}
+
+function renderItems(list) {
+  const visible = list.filter(item => itemFilter === 'all' || item.kind === itemFilter);
+  return (list.length ? renderFilters() : '') + (visible.length ? `<div class="item-grid">${visible.map(renderItem).join('')}</div>` : `<div class="empty-state">${itemFilter === 'all' ? 'No items' : `No ${kinds[itemFilter].plural.toLowerCase()}`}</div>`);
+}
+
+function renderField() {
+  const field = byField(currentField);
+  const parents = ancestry(field.id).slice(0, -1);
+  const list = itemsIn(field.id);
+  const children = fields.filter(child => child.parent === field.id);
+  const related = allEdges().filter(edge => edge.kind !== 'parent' && [edge.from, edge.to].includes(field.id));
+  const crumbs = `<div class="breadcrumb"><button data-action="go-fields">Fields</button>${parents.map(parent => `<span>/</span><button data-action="open-field" data-id="${parent.id}">${escapeHTML(parent.name)}</button>`).join('')}<span>/</span><span>${escapeHTML(field.name)}</span></div>`;
+  const actions = button('<span class="action-label">Subfield</span>', 'new-field', 'quiet', `data-parent="${field.id}" aria-label="New subfield"`, 'subfield') + (fields.length > 1 ? button('', 'connect-fields', 'quiet', 'aria-label="Connect fields"', 'link') : '') + addMenu();
+  return crumbs + heading(field.name, actions, list.length) + (children.length ? `<div class="subfields">${children.map(child => `<button class="subfield" data-action="open-field" data-id="${child.id}" style="--field-color:${child.color}">${icon('folder')}${escapeHTML(child.name)}<small>${itemsIn(child.id).length}</small></button>`).join('')}</div>` : '') + renderItems(list) + (related.length ? `<div class="section-heading">Connections</div><div class="connections">${related.map(edge => `<button class="connection-chip" data-action="open-edge" data-id="${edge.id}">${icon('link')}${escapeHTML(byField(edge.from === field.id ? edge.to : edge.from).name)}<span>${escapeHTML(edge.label)}</span></button>`).join('')}</div>` : '');
+}
+
+function renderEverything() {
+  const actions = fields.length ? addMenu() : button('New field', 'new-field', 'primary', '', 'plus');
+  const tools = `<div class="everything-toolbar"><div class="segmented">${[['map', 'Map'], ['items', 'Items']].map(([key, label]) => `<button class="${everythingMode === key ? 'active' : ''}" data-action="everything-mode" data-mode="${key}">${label}</button>`).join('')}</div>${everythingMode === 'map' && fields.length > 1 ? button('Connect', 'connect-fields', 'secondary compact', '', 'link') : ''}</div>`;
+  if (everythingMode === 'items') return heading('The big FIELD', actions, items.length) + tools + renderItems([...items].reverse());
+  const edge = allEdges().find(candidate => candidate.id === selectedEdge && candidate.kind !== 'parent');
+  return heading('The big FIELD', actions) + tools + (!fields.length ? '<div class="empty-state">No fields</div>' : `<div class="map-layout ${edge ? 'has-inspector' : ''}"><div class="map-shell" id="map-shell"><div class="graph-stage" id="graph-stage"><svg class="graph-lines" id="graph-lines" aria-hidden="true"></svg><div id="graph-nodes"></div><div id="graph-labels"></div></div><div class="map-legend"><span><i></i> Shared items</span><span><i class="dashed"></i> Connection</span></div><div class="map-controls"><button data-action="zoom-out" aria-label="Zoom out">−</button><button data-action="zoom-reset" aria-label="Fit map">${icon('grid')}</button><button data-action="zoom-in" aria-label="Zoom in">+</button></div></div>${edge ? renderInspector(edge) : ''}</div>`);
+}
+
+function allEdges() {
+  const shared = [];
+  for (let a = 0; a < fields.length; a++) {
+    for (let b = a + 1; b < fields.length; b++) {
+      const matches = items.filter(item => item.fields.includes(fields[a].id) && item.fields.includes(fields[b].id));
+      if (matches.length) shared.push({ id: `shared-${fields[a].id}-${fields[b].id}`, kind: 'shared', from: fields[a].id, to: fields[b].id, items: matches.map(item => item.id), label: `${matches.length} ${matches.length === 1 ? 'item' : 'items'}` });
+    }
+  }
+  return [...fields.filter(field => field.parent).map(field => ({ id: `parent-${field.id}`, kind: 'parent', from: field.parent, to: field.id })), ...shared, ...connections];
+}
+
+function renderInspector(edge) {
+  return `<aside class="map-inspector"><div class="inspector-top"><span>${escapeHTML(byField(edge.from).name)} / ${escapeHTML(byField(edge.to).name)}</span><button class="icon-button" data-action="close-edge" aria-label="Close connection">${icon('close')}</button></div><h2>${edge.kind === 'shared' ? 'Shared items' : escapeHTML(edge.label)}</h2>${edge.note ? `<p>${escapeHTML(edge.note)}</p>` : ''}${(edge.items || []).map(id => { const item = byItem(id); return `<button class="shared-item" data-action="open-item" data-id="${id}">${icon(kinds[item.kind].icon)}<span>${escapeHTML(item.title)}</span></button>`; }).join('')}${button('Open field', 'open-field', 'secondary compact', `data-id="${edge.from}"`, 'arrow')}</aside>`;
+}
+
+function nodePosition(field) {
+  if (positions.has(field.id)) return positions.get(field.id);
+  const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(fields.length))));
+  const index = fields.indexOf(field);
+  return { x: (mapSize.width - (columns * 176 + (columns - 1) * 70)) / 2 + index % columns * 246, y: 70 + Math.floor(index / columns) * 150 };
+}
+
+function drawEdges() {
+  const edges = allEdges();
+  $('#graph-lines').innerHTML = edges.map(edge => {
+    const a = nodePosition(byField(edge.from));
+    const b = nodePosition(byField(edge.to));
+    return `<path class="edge ${edge.kind} ${edge.id === selectedEdge ? 'selected' : ''}" d="M ${a.x + 88} ${a.y + 38} Q ${(a.x + b.x) / 2 + 88} ${(a.y + b.y) / 2 + 12} ${b.x + 88} ${b.y + 38}"/>`;
+  }).join('');
+  $('#graph-labels').innerHTML = edges.filter(edge => edge.kind !== 'parent').map(edge => {
+    const a = nodePosition(byField(edge.from));
+    const b = nodePosition(byField(edge.to));
+    return `<button class="edge-label ${edge.id === selectedEdge ? 'selected' : ''}" data-action="select-edge" data-id="${edge.id}" style="left:${(a.x + b.x) / 2 + 88}px;top:${(a.y + b.y) / 2 + (edge.kind === 'related' ? 53 : 25)}px" aria-label="${escapeHTML(byField(edge.from).name)} to ${escapeHTML(byField(edge.to).name)}: ${escapeHTML(edge.label)}">${escapeHTML(edge.label)}</button>`;
+  }).join('');
+}
+
+function initMap() {
+  const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(fields.length))));
+  mapSize = { width: Math.max(600, columns * 246 + 50), height: Math.max(400, Math.ceil(fields.length / columns) * 150 + 100) };
+  $('#graph-stage').style.width = `${mapSize.width}px`;
+  $('#graph-stage').style.height = `${mapSize.height}px`;
+  $('#graph-lines').setAttribute('viewBox', `0 0 ${mapSize.width} ${mapSize.height}`);
+  $('#graph-nodes').innerHTML = fields.map(field => {
+    const position = nodePosition(field);
+    return `<button class="graph-node" data-action="open-field" data-map-node="${field.id}" data-id="${field.id}" style="left:${position.x}px;top:${position.y}px;--field-color:${field.color}" aria-label="Open ${escapeHTML(fieldPath(field.id))}">${icon('folder')}<div><strong>${escapeHTML(field.name)}</strong><small>${itemsIn(field.id).length} ${itemsIn(field.id).length === 1 ? 'item' : 'items'}</small></div></button>`;
+  }).join('');
+  drawEdges();
+  const fit = () => {
+    const shell = $('#map-shell');
+    const stage = $('#graph-stage');
+    if (!shell || !stage) return;
+    const scale = Math.min(1.2, (shell.clientWidth - 25) / mapSize.width, (shell.clientHeight - 70) / mapSize.height) * zoom;
+    stage.style.transform = `translate(-50%,-50%) scale(${scale})`;
+    stage.dataset.scale = scale;
+  };
+  mapObserver = new ResizeObserver(fit);
+  mapObserver.observe($('#map-shell'));
+  fit();
+}
+
+function showModal(title, html, wide = false) {
+  drawingPad?.destroy();
+  drawingPad = null;
+  returnFocus = document.activeElement.closest('.add-menu') ? document.querySelector('[data-action="toggle-add"]') : document.activeElement;
+  const modal = $('#modal');
+  modal.classList.toggle('wide', wide);
+  $('#modal-content').innerHTML = `<div class="modal-header"><h2 id="modal-title">${escapeHTML(title)}</h2><button class="icon-button" data-action="close-modal" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body">${html}</div>`;
+  if (!modal.open) modal.showModal();
+  modal.querySelector('input:not([type=file]):not([type=hidden]), textarea, select')?.focus();
+}
+
+function closeModal() {
+  $('#modal').close();
+}
+
+function toast(message) {
+  $('#toast').textContent = message;
+  $('#toast').classList.add('visible');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => $('#toast').classList.remove('visible'), 2200);
+}
+
+function newField(parent = null) {
+  let color = parent ? byField(parent).color : colors[0];
+  showModal(parent ? 'New subfield' : 'New field', `<form id="field-form"><label class="form-label" for="field-name">Name</label><input class="input" id="field-name" maxlength="64" required autocomplete="off"><div class="swatches">${colors.map(candidate => `<button type="button" class="swatch ${candidate === color ? 'selected' : ''}" style="--swatch:${candidate}" data-color="${candidate}" aria-label="${candidate}" aria-pressed="${candidate === color}"></button>`).join('')}</div><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Create</button></div></form>`);
+  document.querySelectorAll('[data-color]').forEach(node => node.onclick = () => {
+    color = node.dataset.color;
+    document.querySelectorAll('[data-color]').forEach(candidate => {
+      candidate.classList.toggle('selected', candidate === node);
+      candidate.setAttribute('aria-pressed', String(candidate === node));
+    });
+  });
+  $('#field-form').onsubmit = event => {
+    event.preventDefault();
+    const name = $('#field-name').value.trim();
+    if (!name) return;
+    const field = { id: uid('field'), name, color, parent };
+    fields.push(field);
+    closeModal();
+    navigate('field', field.id);
+  };
+}
+
+function fieldOptions(selected) {
+  return fields.map(field => `<option value="${field.id}" ${field.id === selected ? 'selected' : ''}>${escapeHTML(fieldPath(field.id))}</option>`).join('');
+}
+
+function normalizeURL(raw) {
+  const text = raw.trim();
+  if (!text) throw new Error('Enter a URL.');
+  const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Use an http or https URL.');
+  return url.href;
+}
+
+function compose(kind, existingId = null) {
+  const existing = existingId ? byItem(existingId) : null;
+  const inField = currentField;
+  if (!fields.length) return newField();
+  let chosenFile = existingId ? attachments.get(existingId)?.file : null;
+  const fieldSelect = !existing && !inField ? `<label class="form-label" for="item-field">Field</label><select class="input" id="item-field">${fieldOptions(fields[0].id)}</select>` : '';
+  let body = '';
+  if (kind === 'link') body = `<label class="form-label" for="item-url">URL</label><input class="input" id="item-url" placeholder="https://" value="${escapeHTML(existing?.url || '')}" required>`;
+  if (kind === 'file') body = `<div class="file-picker"><button class="button secondary" type="button" id="choose-file">${icon('file')}Choose file</button><input type="file" id="file-input" hidden><span class="file-picker-name" id="file-picker-name">${escapeHTML(existing?.fileName || '')}</span></div><label class="form-label" for="item-path">PC path <span class="optional">optional if a file is selected</span></label><input class="input" id="item-path" placeholder="C:\\" value="${escapeHTML(existing?.path || '')}">`;
+  body += `<label class="form-label" for="item-title">Name <span class="optional">optional</span></label><input class="input" id="item-title" maxlength="120" value="${escapeHTML(existing?.title || '')}">`;
+  if (kind === 'note') body += `<label class="form-label" for="item-body">Note</label><textarea class="input note-body" id="item-body" required>${escapeHTML(existing?.body || '')}</textarea>`;
+  if (kind === 'drawing') body += `<div class="drawing-toolbar"><input type="color" id="pen-color" class="drawing-color" value="#d5dff3" aria-label="Pen color"><input type="range" id="pen-width" min="1" max="12" value="2" aria-label="Pen width"><button class="button secondary compact" type="button" id="drawing-undo">${icon('undo')}Undo</button><button class="button secondary compact" type="button" id="drawing-clear">Clear</button></div><canvas class="drawing-canvas" id="drawing-canvas" aria-label="Drawing canvas"></canvas>`;
+  showModal(`${existing ? 'Edit' : 'New'} ${typeName(kind).toLowerCase()}`, `<form id="item-form">${body}${fieldSelect}<p class="form-error" id="item-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">${existing ? 'Save' : 'Add'}</button></div></form>`, kind === 'note' || kind === 'drawing');
+  if (kind === 'file') $('#choose-file').onclick = () => $('#file-input').click();
+  if (kind === 'file') $('#file-input').onchange = event => {
+    if (!event.target.files[0]) return;
+    chosenFile = event.target.files[0];
+    $('#item-path').value = '';
+    $('#file-picker-name').textContent = chosenFile?.name || '';
+    if (!$('#item-title').value && chosenFile) $('#item-title').value = chosenFile.name;
+  };
+  if (kind === 'drawing') {
+    drawingPad = window.FieldDrawing.mount($('#drawing-canvas'), { color: '#d5dff3', lineWidth: 2, initialDataUrl: existing?.drawing });
+    $('#pen-color').oninput = event => drawingPad.setColor(event.target.value);
+    $('#pen-width').oninput = event => drawingPad.setLineWidth(event.target.value);
+    $('#drawing-undo').onclick = () => drawingPad.undo();
+    $('#drawing-clear').onclick = () => drawingPad.clear();
+  }
+  $('#item-form').onsubmit = event => {
+    event.preventDefault();
+    try {
+      const record = existing ? { ...existing } : { id: uid('item'), kind, fields: [inField || $('#item-field').value], createdAt: Date.now() };
+      let title = $('#item-title').value.trim();
+      if (kind === 'link') {
+        record.url = normalizeURL($('#item-url').value);
+        title ||= new URL(record.url).hostname;
+      } else if (kind === 'note') {
+        record.body = $('#item-body').value.trim();
+        if (!record.body) throw new Error('Enter a note.');
+        title ||= record.body.split('\n')[0].slice(0, 64);
+      } else if (kind === 'file') {
+        record.path = $('#item-path').value.trim();
+        if (!chosenFile && !record.path) throw new Error('Select a file or enter its PC path.');
+        if (record.path && !/^(?:[a-z]:[\\/]|\\\\)/i.test(record.path)) throw new Error('Enter an absolute Windows path.');
+        record.fileName = chosenFile?.name || record.path.split(/[\\/]/).pop();
+        if (chosenFile) {
+          record.size = chosenFile.size;
+          record.mime = chosenFile.type;
+        }
+        title ||= record.fileName;
+      } else if (kind === 'drawing') {
+        if (!drawingPad.hasContent()) throw new Error('Add a drawing.');
+        record.drawing = drawingPad.toDataURL();
+        title ||= 'Drawing';
+      }
+      record.title = title;
+      if (chosenFile) {
+        attachments.get(record.id)?.url && URL.revokeObjectURL(attachments.get(record.id).url);
+        attachments.set(record.id, { file: chosenFile, url: URL.createObjectURL(chosenFile) });
+      }
+      if (existing) items.splice(items.indexOf(existing), 1, record);
+      else items.push(record);
+      closeModal();
+      itemFilter = 'all';
+      render();
+      if (existing) openItem(record.id);
+    } catch (error) {
+      $('#item-error').textContent = error.message === 'Invalid URL' ? 'Enter a valid URL.' : error.message;
+    }
+  };
+}
+
+function openItem(id) {
+  const item = byItem(id);
+  const file = attachments.get(id);
+  const meta = kinds[item.kind];
+  let body = item.kind === 'note' ? `<div class="detail-body">${escapeHTML(item.body)}</div>` : item.kind === 'drawing' ? `<img class="detail-drawing" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : item.kind === 'link' ? `<a class="detail-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.url)}</a>` : `${file && item.mime?.startsWith('image/') ? `<img class="detail-image" src="${file.url}" alt="${escapeHTML(item.title)}">` : ''}${item.path ? `<div class="detail-path">${escapeHTML(item.path)}</div>` : `<div class="detail-path">${escapeHTML(item.fileName)}</div>`}${item.size !== undefined ? `<div class="detail-metadata">${formatSize(item.size)}</div>` : ''}`;
+  const openAction = item.kind === 'link' ? `<a class="button secondary compact" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${icon('external')}Open</a>` : item.kind === 'file' ? (file ? `<a class="button secondary compact" href="${file.url}" target="_blank" rel="noopener">${icon('external')}Open file</a>` : '') + (item.path ? button('Copy path', 'copy-path', 'secondary compact', `data-id="${id}"`, 'copy') : '') : item.kind === 'drawing' ? `<a class="button secondary compact" href="${item.drawing}" download="${escapeHTML(item.title.replace(/[^a-z0-9_-]/gi, '_'))}.png">Save PNG</a>` : '';
+  $('#detail-panel').innerHTML = `<div class="detail-top"><span>${icon(meta.icon)}${meta.label}</span><button class="icon-button" data-action="close-detail" aria-label="Close item">${icon('close')}</button></div><h2>${escapeHTML(item.title)}</h2>${body}<div class="detail-actions">${openAction}${button('Edit', 'edit-item', 'secondary compact', `data-id="${id}"`)}</div><div class="detail-fields-title"><span>Fields</span>${button('Add to field', 'share-item', 'quiet compact', `data-id="${id}"`, 'plus')}</div><div class="membership-list">${item.fields.map(fieldId => `<button data-action="open-field" data-id="${fieldId}" style="--field-color:${byField(fieldId).color}"><span class="field-dot"></span>${escapeHTML(fieldPath(fieldId))}<span class="membership-arrow">↗</span></button>`).join('')}</div>`;
+  $('#detail-panel').hidden = false;
+}
+
+function closeDetail() {
+  $('#detail-panel').hidden = true;
+}
+
+function shareItem(id) {
+  const item = byItem(id);
+  const available = fields.filter(field => !item.fields.includes(field.id));
+  showModal('Add to field', available.length ? `<form id="share-form"><label class="form-label" for="share-field">Field</label><select class="input" id="share-field">${available.map(field => `<option value="${field.id}">${escapeHTML(fieldPath(field.id))}</option>`).join('')}</select><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Add</button></div></form>` : '<div class="blank-message">Already in all fields</div>');
+  if (available.length) $('#share-form').onsubmit = event => {
+    event.preventDefault();
+    item.fields.push($('#share-field').value);
+    closeModal();
+    render();
+    openItem(id);
+  };
+}
+
+function newConnection() {
+  if (fields.length < 2) return;
+  const source = currentField || fields[0].id;
+  const target = fields.find(field => field.id !== source).id;
+  showModal('Connect fields', `<form id="connection-form"><label class="form-label" for="connection-from">From</label><select class="input" id="connection-from">${fieldOptions(source)}</select><label class="form-label" for="connection-to">To</label><select class="input" id="connection-to">${fieldOptions(target)}</select><label class="form-label" for="connection-label">Label</label><input class="input" id="connection-label" maxlength="64" required><label class="form-label" for="connection-note">Note <span class="optional">optional</span></label><textarea class="input short-note" id="connection-note"></textarea><p id="connection-error" class="form-error" role="alert"></p><div class="form-actions">${button('Cancel', 'close-modal', 'quiet', 'type="button"')}<button class="button primary" type="submit">Connect</button></div></form>`);
+  $('#connection-form').onsubmit = event => {
+    event.preventDefault();
+    const from = $('#connection-from').value;
+    const to = $('#connection-to').value;
+    if (from === to) { $('#connection-error').textContent = 'Choose two different fields.'; return; }
+    const label = $('#connection-label').value.trim();
+    if (!label) return;
+    const edge = { id: uid('connection'), from, to, kind: 'related', label, note: $('#connection-note').value.trim() };
+    connections.push(edge);
+    selectedEdge = edge.id;
+    closeModal();
+    everythingMode = 'map';
+    navigate('everything');
+  };
+}
+
+function search() {
+  showModal('Search', '<input class="input search-input" id="search-query" placeholder="Search" aria-label="Search library" autocomplete="off"><div class="search-results" id="search-results"></div>');
+  const update = () => {
+    const query = $('#search-query').value.trim().toLowerCase();
+    const matches = [...fields.filter(field => field.name.toLowerCase().includes(query)).map(field => `<button class="search-result" data-action="search-field" data-id="${field.id}">${icon('folder')}<div><strong>${escapeHTML(field.name)}</strong><small>${escapeHTML(fieldPath(field.id))}</small></div></button>`), ...items.filter(item => [item.title, item.body, item.path, item.url].some(value => value?.toLowerCase().includes(query))).map(item => `<button class="search-result" data-action="search-item" data-id="${item.id}">${icon(kinds[item.kind].icon)}<div><strong>${escapeHTML(item.title)}</strong><small>${typeName(item.kind)}</small></div></button>`)];
+    $('#search-results').innerHTML = matches.join('') || '<div class="search-empty">No results</div>';
+  };
+  $('#search-query').oninput = update;
+  update();
+}
+
+function library() {
+  showModal('Library', `<div class="library-row"><span>Fields</span><span>${fields.length}</span></div>${Object.entries(kinds).map(([kind, meta]) => `<div class="library-row"><span>${meta.plural}</span><span>${items.filter(item => item.kind === kind).length}</span></div>`).join('')}<p class="library-status">Prototype · session only</p>`);
+}
+
+document.addEventListener('click', async event => {
+  const nav = event.target.closest('[data-view]');
+  if (nav) navigate(nav.dataset.view);
+  const node = event.target.closest('[data-action]');
+  if (node && !node.disabled) {
+    const id = node.dataset.id;
+    switch (node.dataset.action) {
+      case 'go-fields': navigate('fields'); break;
+      case 'open-field': if (!dragged) navigate('field', id); break;
+      case 'new-field': newField(node.dataset.parent || null); break;
+      case 'close-modal': closeModal(); break;
+      case 'close-detail': closeDetail(); break;
+      case 'toggle-add': {
+        const menu = $('#add-menu');
+        menu.hidden = !menu.hidden;
+        node.setAttribute('aria-expanded', String(!menu.hidden));
+        break;
+      }
+      case 'add-item':
+        $('#add-menu').hidden = true;
+        document.querySelector('[data-action="toggle-add"]').setAttribute('aria-expanded', 'false');
+        compose(node.dataset.kind);
+        break;
+      case 'edit-item': compose(byItem(id).kind, id); break;
+      case 'open-item': openItem(id); break;
+      case 'share-item': shareItem(id); break;
+      case 'copy-path':
+        try { await navigator.clipboard.writeText(byItem(id).path); toast('Path copied'); }
+        catch { toast('Clipboard unavailable'); }
+        break;
+      case 'filter': itemFilter = node.dataset.kind; render(); break;
+      case 'everything-mode': everythingMode = node.dataset.mode; itemFilter = 'all'; render(); break;
+      case 'connect-fields': newConnection(); break;
+      case 'select-edge': selectedEdge = id; render(); break;
+      case 'open-edge': selectedEdge = id; everythingMode = 'map'; navigate('everything'); break;
+      case 'close-edge': selectedEdge = null; render(); break;
+      case 'zoom-in': zoom = Math.min(1.8, zoom + .15); render(); break;
+      case 'zoom-out': zoom = Math.max(.5, zoom - .15); render(); break;
+      case 'zoom-reset': zoom = 1; render(); break;
+      case 'search-field': closeModal(); navigate('field', id); break;
+      case 'search-item': closeModal(); openItem(id); break;
+    }
+  }
+  if (!event.target.closest('.add-menu-wrap')) {
+    const menu = $('#add-menu');
+    if (menu) menu.hidden = true;
+    document.querySelector('[data-action="toggle-add"]')?.setAttribute('aria-expanded', 'false');
+  }
+});
+
+document.addEventListener('pointerdown', event => {
+  const node = event.target.closest('[data-map-node]');
+  if (!node || event.button !== 0) return;
+  const id = node.dataset.mapNode;
+  const origin = nodePosition(byField(id));
+  const start = { x: event.clientX, y: event.clientY };
+  const scale = Number($('#graph-stage').dataset.scale);
+  dragged = false;
+  const move = next => {
+    const dx = (next.clientX - start.x) / scale;
+    const dy = (next.clientY - start.y) / scale;
+    if (Math.abs(dx) + Math.abs(dy) > 6) dragged = true;
+    if (!dragged) return;
+    const position = { x: Math.max(0, Math.min(mapSize.width - 176, origin.x + dx)), y: Math.max(0, Math.min(mapSize.height - 77, origin.y + dy)) };
+    positions.set(id, position);
+    node.style.left = `${position.x}px`;
+    node.style.top = `${position.y}px`;
+    drawEdges();
+  };
+  const stop = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', stop);
+    document.removeEventListener('pointercancel', stop);
+    setTimeout(() => { dragged = false; }, 100);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', stop);
+  document.addEventListener('pointercancel', stop);
+});
+
+$('.brand').onclick = event => { event.preventDefault(); navigate('fields'); };
+$('#search-button').onclick = search;
+$('#settings').onclick = library;
+$('#modal').addEventListener('close', () => {
+  drawingPad?.destroy();
+  drawingPad = null;
+  if (returnFocus?.isConnected) returnFocus.focus();
+});
+$('#modal').addEventListener('click', event => {
+  if (event.target !== $('#modal')) return;
+  const bounds = $('#modal').getBoundingClientRect();
+  if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closeModal();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    if (!$('#modal').open) closeDetail();
+    const menu = $('#add-menu');
+    if (menu) menu.hidden = true;
+  }
+  if (event.key === '/' && !$('#modal').open && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+    event.preventDefault();
+    search();
+  }
+});
+document.querySelectorAll('[data-icon]').forEach(node => { node.innerHTML = icon(node.dataset.icon); });
+render();
