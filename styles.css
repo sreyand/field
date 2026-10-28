@@ -161,6 +161,7 @@ input[type='color']:focus-visible, .swatch:focus-visible {
 .detail-link { color: var(--accent); }
 .detail-drawing, .detail-image { border-radius: 0; }
 .library-row { padding: 14px 0; }
+.library-actions { display: flex; align-items: center; gap: 8px; margin: 18px -9px 0; flex-wrap: wrap; }
 .sidebar-footer { margin-top: auto; display: flex; align-items: center; gap: 4px; padding-top: 20px; flex-shrink: 0; }
 .settings-button { margin-top: 0; flex: 1; }
 .theme-toggle { width: 36px; height: 36px; padding: 9px; color: var(--muted); background: transparent; border: 0; flex-shrink: 0; }
@@ -269,4 +270,58 @@ input[type='color']:focus-visible, .swatch:focus-visible {
 }
 @media(prefers-reduced-motion:reduce) {
   *, *::before, *::after { transition: none!important; animation: none!important; }
+}
+
+/* Quick actions share the library's flat surfaces and typography. */
+.context-menu {
+  position: fixed;
+  z-index: 80;
+  width: 208px;
+  padding: 5px;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: 0;
+}
+.context-menu[hidden] { display: none; }
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 35px;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 0;
+  border-radius: 0;
+  transition: background-color var(--fade), color var(--fade);
+}
+.context-menu-item:hover:not(:disabled),
+.context-menu-item:focus-visible { background: var(--hover); outline: 0; color: var(--accent); }
+.context-menu-icon, .context-menu-icon .icon { width: 15px; height: 15px; flex: 0 0 15px; }
+.context-menu-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.context-menu-item:disabled { opacity: .4; }
+.context-menu-separator { height: 1px; background: var(--line); margin: 5px 10px; opacity: .45; }
+.entry-row.context-menu-target, .field-navigation button.context-menu-target,
+.graph-node.context-menu-target { background: var(--hover-solid); }
+.field-more { min-width: 32px; padding: 8px; }
+.confirm-copy { font-size: 13px; line-height: 1.7; color: var(--muted); margin: 16px 0 24px; }
+
+/* The overview has one toolbar; edge markers sit on their actual connection routes. */
+.overview-toolbar { min-height: 40px; margin-bottom: 24px; }
+.overview-toolbar .header-actions { display: flex; align-items: center; gap: 12px; }
+.edge-label { min-height: 26px; display: grid; place-items: center; background: var(--bg); padding: 4px 8px; }
+.edge-marker { width: 26px; padding: 6px; }
+.edge-marker .icon { width: 14px; height: 14px; }
+.edge-label:focus-visible { outline-offset: 1px; }
+.inspector-fields { display: flex; gap: 4px; flex-wrap: wrap; margin-top: auto; padding-top: 20px; }
+.inspector-fields .button { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+@media(max-width:760px) {
+  .overview-toolbar .header-actions { gap: 4px; }
+  .overview-toolbar .header-actions .button { padding-inline: 8px; }
 }

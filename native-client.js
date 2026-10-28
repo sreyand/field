@@ -1,6 +1,29 @@
 /* A capability-scoped bridge to the local Windows runtime. File contents stay on disk. */
 (function () {
   'use strict';
+  if (window.FieldDesktop?.isDesktop) {
+    const desktop = window.FieldDesktop;
+    let connected = false;
+    async function connect() {
+      try { await desktop.ready; connected = true; return true; }
+      catch { connected = false; return false; }
+    }
+    async function call(method, params, timeout) {
+      if (!await connect()) throw new Error('Reopen FIELD to reconnect the desktop app.');
+      return desktop.request(method, params, timeout);
+    }
+    window.FieldNative = {
+      get available() { return connected; },
+      get configured() { return true; },
+      connect,
+      track: async path => (await call('files.track', { path })).reference,
+      pick: async () => (await call('files.pick', {}, 120000)).reference || null,
+      resolve: async referenceIds => (await call('files.resolve', { referenceIds })).references,
+      open: referenceId => call('files.open', { referenceId })
+    };
+    window.FieldNative.ready = connect();
+    return;
+  }
   let base = location.protocol === 'http:' && location.hostname === '127.0.0.1' ? location.origin : '';
   let token = '';
   let connected = false;

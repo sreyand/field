@@ -27,6 +27,9 @@
     root.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#fcfcfa' : '#101215');
     updateControl();
+    if (window.FieldDesktop?.isDesktop) window.FieldDesktop.ready
+      .then(() => window.FieldDesktop.request('app.theme', { theme }))
+      .catch(() => {});
   }
 
   function setTheme(theme) {

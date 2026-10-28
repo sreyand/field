@@ -4,12 +4,16 @@ using System.Text;
 
 namespace Field.Native;
 
-internal static class NativeFilePicker
+public static class NativeFilePicker
 {
     private static readonly SemaphoreSlim PickerGate = new(1, 1);
 
-    public static async Task<string?> Pick()
+    public static async Task<string?> Pick(nint ownerWindow = default, string? filter = null, string? title = null)
     {
+        var dialogFilter = filter ?? "All files\0*.*\0\0";
+        var dialogTitle = title ?? "Choose a file for FIELD";
+        if (!dialogFilter.EndsWith("\0\0", StringComparison.Ordinal) || dialogFilter.Length > 4096 || dialogTitle.Contains('\0'))
+            throw new ArgumentException("Invalid file picker options.");
         if (!await PickerGate.WaitAsync(0)) throw new InvalidOperationException("A file picker is already open.");
         var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
@@ -22,11 +26,11 @@ internal static class NativeFilePicker
                 var dialog = new OpenFileName
                 {
                     StructSize = Marshal.SizeOf<OpenFileName>(),
-                    Owner = IntPtr.Zero,
-                    Filter = "All files\0*.*\0\0",
+                    Owner = ownerWindow,
+                    Filter = dialogFilter,
                     File = fileBuffer,
                     MaxFile = 32768,
-                    Title = "Choose a file for FIELD",
+                    Title = dialogTitle,
                     Flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008 | 0x00000004
                 };
                 if (GetOpenFileName(ref dialog)) completion.SetResult(Marshal.PtrToStringUni(fileBuffer));

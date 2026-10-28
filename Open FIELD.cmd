@@ -1,19 +1,19 @@
 @echo off
 setlocal
-where dotnet >nul 2>nul
-if errorlevel 1 (
-  echo FIELD requires the .NET 8 SDK. Install it from https://dotnet.microsoft.com/download/dotnet/8.0
-  pause
-  exit /b 1
+if exist "%~dp0FIELD.exe" (
+  start "" "%~dp0FIELD.exe"
+  exit /b 0
 )
-pushd "%~dp0native"
-dotnet build Field.Host.csproj --configuration Release --nologo --verbosity quiet
-if errorlevel 1 (
-  popd
-  echo FIELD could not build its local file runtime.
-  pause
-  exit /b 1
+if exist "%~dp0dist\FIELD-0.1.1-alpha-win-x64\FIELD.exe" (
+  start "" "%~dp0dist\FIELD-0.1.1-alpha-win-x64\FIELD.exe"
+  exit /b 0
 )
-popd
-set "FIELD_LAUNCH_ROOT=%~dp0"
-powershell -NoProfile -Command "$fieldRoot = $env:FIELD_LAUNCH_ROOT; $fieldDll = Join-Path $fieldRoot 'native\bin\Release\net8.0-windows\Field.Host.dll'; $fieldArgs = '\"' + $fieldDll + '\" --root \"' + $fieldRoot.TrimEnd('\') + '\" --open'; Start-Process -FilePath 'dotnet' -ArgumentList $fieldArgs -WindowStyle Hidden"
+if exist "%~dp0dist\FIELD-0.1.0-alpha-win-x64\FIELD.exe" (
+  start "" "%~dp0dist\FIELD-0.1.0-alpha-win-x64\FIELD.exe"
+  exit /b 0
+)
+echo FIELD has not been packaged in this checkout yet.
+echo Build it once with the .NET 10 SDK:
+echo powershell -NoProfile -File "%~dp0scripts\package-windows.ps1"
+pause
+exit /b 1

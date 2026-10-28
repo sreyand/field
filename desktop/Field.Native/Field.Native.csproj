@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Field.Native</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../native/NativeFileIdentity.cs" Link="NativeFileIdentity.cs" />
+    <Compile Include="../../native/FileReferenceService.cs" Link="FileReferenceService.cs" />
+    <Compile Include="../../native/NativeFilePicker.cs" Link="NativeFilePicker.cs" />
+  </ItemGroup>
+</Project>

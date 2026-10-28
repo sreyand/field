@@ -1,37 +1,37 @@
-# FIELD
+# FIELD — Windows alpha
 
-A Windows filesystem wrapper and personal archive. Fresh libraries start empty. DM Sans is bundled locally, with light/dark themes and square, borderless surfaces.
+Extract `dist/FIELD-0.1.1-alpha-win-x64.zip` and double-click **FIELD.exe**, or use **Open FIELD.cmd** from this checkout after building the package. FIELD opens in its own Windows window. No .NET SDK or separate .NET installation is required to run the portable package.
 
-Double-click **Open FIELD.cmd**. Windows and the **.NET 8 SDK** are required for this source checkout. The launcher builds a small local runtime without external NuGet dependencies, then opens the existing interface in your default browser. Opening `index.html` directly still supports the browser-only archive; tracked Windows files need the launcher running.
+The package targets 64-bit Windows and uses the Microsoft Edge WebView2 Evergreen Runtime. It is already installed on this development machine. A missing-runtime message links to Microsoft's installer. This first alpha is unsigned.
 
-Create fields and subfields, then add links, files, notes, and drawings. **Add → Existing item** puts the same item in another field. Edits apply everywhere. **Fields → Manage** changes memberships; removing every membership keeps the item under **FIELD logo → Items**. Shared items create connections in the map, alongside manually labeled connections.
+Fresh desktop libraries are empty. Your catalogue is saved in `%LOCALAPPDATA%\FIELD\Desktop\library.json`; registered file identities are in `file-references.json`. The WebView profile in the same folder stores appearance preferences. Replacing or moving the program folder leaves this app-owned data in place. Closing the window shuts down FIELD; launching again focuses the existing window when it is already open.
 
-Feature 2 adds native file references:
+To bring over an existing browser library:
 
-- **Choose file** uses the Windows chooser and records its full path. You can also enter a PC path.
-- Supported local files retain their identity across renames and moves on the same volume. FIELD checks registered references periodically while visible and updates their paths. Custom item names and field memberships remain intact.
-- Missing files, offline drives, access failures, and files replaced at the old path have distinct states. Unavailable references keep their original identity and metadata.
-- **Relink** chooses a new target for the existing item. It preserves the item ID, name, other content, and memberships. A target already archived as another item is rejected instead of overwriting either record.
-- **Open file** resolves the registered reference before asking Windows to open it.
+1. Open the original `index.html` in the same browser and location you used previously, or use **Open FIELD browser.cmd**.
+2. Open **Library → Export library** and save the JSON file.
+3. Open the desktop app, then **Library → Import library** and choose that export.
 
-Automatic recovery is verified on local NTFS. Moving across volumes needs relinking. Filesystems without stable ID support are labeled **Path only**; they cannot guarantee identity when a path is reused. Older browser-only references need **Track file** to bind a real Windows file. FIELD does not crawl drives, copy selected files, upload their contents, or prevent Windows from moving/deleting them.
+Import is available for an empty desktop library and preserves canonical item IDs, field memberships, hierarchy, connections, notes, links, drawings, and native file references. The original browser library is kept. Invalid exports and existing desktop libraries are not overwritten. The alpha import limit is 64 MB. Selected files remain references to their original locations; exporting the catalogue does not copy those file contents.
 
-The catalogue (fields, notes, links, drawings, memberships, connections) remains in IndexedDB for the same browser and location. Native file identities and metadata are saved separately in `%LOCALAPPDATA%\FIELD\file-references.json`. Keep both for backups. Switching browsers, clearing browser storage, or moving this checkout can change which browser catalogue opens. Saves reject stale windows rather than overwrite newer changes.
+Fields, subfields, links, files, notes, drawings, shared references, connections, basic search, native file selection/opening, and same-volume NTFS rename/move tracking are included. Use **Relink** for cross-volume moves or unavailable targets. File status and relinking preserve the item and its memberships. The interface uses local DM Sans, dark/light themes, and compact borderless rows.
 
-The launcher preserves the existing file-URL catalogue. A browser may ask for local-network access when that page connects to the runtime. Reopening the launcher reconnects an expired runtime session. The runtime binds only to `127.0.0.1` and protects file operations with a per-process capability. See [native/README.md](native/README.md) for launch, storage, and development details.
+Right-click an item or field for quick actions, or use **Shift+F10** on a focused row. Delete a field through **Delete field** in its menu or the field page's **…** button. Deletion removes the field and its connections, keeps all archived items and PC files, and moves direct subfields to its parent. The overview's **Items** tab includes items without a field. Connection names are optional.
+
+Build the portable package from source with the .NET 10 SDK:
+
+```powershell
+powershell -NoProfile -File scripts/package-windows.ps1
+```
+
+The script bundles .NET 10.0.14, the WebView2 SDK loader, UI assets and dependency notices; it writes the extracted package, ZIP and SHA256 checksum to `dist/`. Use `-Force` for a rebuild; previous output is retained under a `.previous` name. See [desktop/PACKAGING.md](desktop/PACKAGING.md).
 
 Verification:
 
 ```powershell
-node --test tests/library-model.test.js
-cd native
-dotnet build Field.Host.csproj --configuration Release
-cd ..
-node native/host-smoke.mjs "C:\absolute\disposable-fixture-parent"
-cd tests/native
-dotnet run -- "C:\absolute\disposable-fixture-parent"
+node --test tests/*.test.js
+cd desktop
+dotnet run --project tests/backend/Field.BackendSmoke.csproj -- "C:\absolute\disposable-fixture-parent"
 ```
 
-Tests cover canonical records, memberships, native identity/relink validation, real Windows renames and moves, saved identity recovery, missing/replaced files, registry persistence, and local API boundaries. Browser checks cover adding, renaming, missing-file status, relinking, and reloads. The Windows chooser was checked for opening and cancellation; full chooser selection remains a manual check. Automated browser verification uses the HTTP development origin, which has a separate catalogue; it does not migrate or modify the existing file-URL catalogue. The file-URL launcher has not been verified through browser automation.
-
-Sources: `app.js`, `library-model.js`, `library-storage.js`, `native-client.js`, `native/`, `appearance.js`, `styles.css`, and `drawing.js`. DM Sans is bundled under the SIL Open Font License in `assets/fonts/`.
+The legacy HTTP prototype remains under `native/` for browser migration and development. Its command-line build requires the .NET 8 SDK; the packaged desktop app uses its native bridge directly and does not start that HTTP service.

@@ -21,6 +21,112 @@ test('a fresh library is empty', () => {
   assert.deepEqual(new LibraryModel().snapshot(), { version: 1, fields: [], items: [], memberships: [], connections: [] });
 });
 
+test('deleting a nested field promotes only its direct children and preserves hierarchy references', () => {
+  const model = library();
+  const add = (id, parent) => model.createField({ id, parent, name: id, color: '#6384ff' });
+  add('nested', 'a');
+  const first = add('child-one', 'nested');
+  const second = add('child-two', 'nested');
+  const grandchild = add('grandchild', 'child-one');
+  const fieldsArray = model.fields;
+  const existingRoot = model.fields[0];
+  assert.deepEqual(model.deleteField('nested'), {
+    fieldId: 'nested', parentId: 'a', children: ['child-one', 'child-two'], removedConnections: []
+  });
+  assert.equal(model.fields, fieldsArray);
+  assert.equal(model.fields[0], existingRoot);
+  assert.equal(model.fields.find(field => field.id === 'child-one'), first);
+  assert.equal(model.fields.find(field => field.id === 'child-two'), second);
+  assert.equal(model.fields.find(field => field.id === 'grandchild'), grandchild);
+  assert.equal(first.parent, 'a');
+  assert.equal(second.parent, 'a');
+  assert.equal(grandchild.parent, 'child-one');
+  assert.equal(model.fields.some(field => field.id === 'nested'), false);
+  assert.deepEqual(new LibraryModel(model.snapshot()).snapshot(), model.snapshot());
+});
+
+test('deleting a root field promotes subfields to roots and removes only its incident connections', () => {
+  const model = library();
+  model.createField({ id: 'child', parent: 'a', name: 'Child', color: '#6384ff' });
+  model.createConnection({ id: 'outgoing', from: 'a', to: 'b', label: 'Outgoing' });
+  model.createConnection({ id: 'incoming', from: 'c', to: 'a', label: 'Incoming' });
+  const retained = model.createConnection({ id: 'retained', from: 'b', to: 'child', label: 'Retained' });
+  const connectionsArray = model.connections;
+  assert.deepEqual(model.deleteField('a'), {
+    fieldId: 'a', parentId: null, children: ['child'], removedConnections: ['outgoing', 'incoming']
+  });
+  assert.equal(model.fields.find(field => field.id === 'child').parent, null);
+  assert.equal(model.connections, connectionsArray);
+  assert.deepEqual(model.connections, [retained]);
+  assert.equal(model.connections[0], retained);
+  assert.deepEqual(new LibraryModel(model.snapshot()).snapshot(), model.snapshot());
+});
+
+test('deleting a field preserves shared and sole-member canonical records of every kind', () => {
+  const model = library();
+  for (const [index, record] of records.entries()) model.createItem(record, index % 2 ? ['a', 'b'] : ['a']);
+  model.createItem({ id: 'already-unfiled', kind: 'note', title: 'Unfiled', body: 'Keep me' }, []);
+  const itemsArray = model.items;
+  const canonical = [...model.items];
+  const before = model.snapshot().items;
+  model.deleteField('a');
+  assert.equal(model.items, itemsArray);
+  assert.deepEqual(model.snapshot().items, before);
+  for (const [index, item] of model.items.entries()) assert.equal(item, canonical[index]);
+  assert.deepEqual(model.items.map(item => item.fields), [[], ['b'], [], ['b'], []]);
+  assert.deepEqual(new LibraryModel(model.snapshot()).snapshot(), model.snapshot());
+  model.setMemberships('note', ['c']);
+  assert.equal(model.items[0], canonical[0]);
+  assert.deepEqual(model.items[0].fields, ['c']);
+});
+
+test('field deletion preserves native file objects, reference IDs, and deduplication indexes', () => {
+  const model = library();
+  const native = nativeFile();
+  model.createItem(trackedRecord('tracked', native), ['a']);
+  const canonical = model.items[0];
+  const nativeObject = canonical.native;
+  const before = model.snapshot().items[0];
+  model.deleteField('a');
+  assert.equal(model.items[0], canonical);
+  assert.equal(canonical.native, nativeObject);
+  assert.deepEqual(model.snapshot().items[0], before);
+  assert.deepEqual(model.createItem(trackedRecord('alias', native), ['b']), { itemId: 'tracked', created: false, added: 1 });
+  assert.deepEqual(canonical.fields, ['b']);
+  const mismatched = nativeFile({ identity: { ...native.identity, fileId: '00000000000000000000000000000002' } });
+  assert.throws(() => model.createItem(trackedRecord('collision', mismatched), ['c']), /Native reference ID already belongs/);
+  assert.equal(model.items.length, 1);
+});
+
+test('deleting all fields retains items in a valid snapshot and permits reusing a deleted field ID', () => {
+  const model = library();
+  for (const record of records) model.createItem(record, ['a']);
+  for (const id of ['a', 'b', 'c']) model.deleteField(id);
+  const snapshot = model.snapshot();
+  assert.deepEqual(snapshot.fields, []);
+  assert.deepEqual(snapshot.memberships, []);
+  assert.equal(snapshot.items.length, records.length);
+  assert.deepEqual(new LibraryModel(snapshot).snapshot(), snapshot);
+  model.createField({ id: 'a', parent: null, name: 'New A', color: '#6384ff' });
+  model.setMemberships('note', ['a']);
+  assert.deepEqual(model.items[0].fields, ['a']);
+});
+
+test('invalid or missing field deletion fails before any mutation', () => {
+  const model = library();
+  model.createItem(records[0], ['a', 'b']);
+  model.createConnection({ id: 'related', from: 'a', to: 'b', label: 'Related' });
+  const before = model.snapshot();
+  const canonicalField = model.fields[0];
+  const canonicalItem = model.items[0];
+  for (const invalid of ['missing', '', ' a', 'bad/id', null, 5]) {
+    assert.throws(() => model.deleteField(invalid));
+    assert.deepEqual(model.snapshot(), before);
+    assert.equal(model.fields[0], canonicalField);
+    assert.equal(model.items[0], canonicalItem);
+  }
+});
+
 for (const source of records) test(`${source.kind}: one canonical record is shared and edited across fields`, () => {
   const model = library();
   const arrays = { fields: model.fields, items: model.items, connections: model.connections };

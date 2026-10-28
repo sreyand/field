@@ -3,6 +3,18 @@
   'use strict';
 
   function open(name = 'field-library-v1') {
+    if (window.FieldDesktop?.isDesktop) {
+      const desktop = window.FieldDesktop;
+      const call = async (method, params = {}) => {
+        await desktop.ready;
+        return desktop.request(method, params, 60000);
+      };
+      return {
+        load: () => call('library.load'),
+        save: (snapshot, expectedRevision) => call('library.save', { snapshot, expectedRevision }),
+        import: (snapshot, expectedRevision) => call('library.import', { snapshot, expectedRevision })
+      };
+    }
     let databasePromise;
 
     function database() {

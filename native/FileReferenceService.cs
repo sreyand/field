@@ -25,32 +25,118 @@ public sealed class FileReferenceService : IDisposable
         registryLock = new FileStream(System.IO.Path.Combine(dataDirectory, "file-references.lock"),
             FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         registryPath = System.IO.Path.Combine(dataDirectory, "file-references.json");
+        try { LoadRegistry(); }
+        catch { registryLock.Dispose(); throw; }
+    }
+
+    private void LoadRegistry()
+    {
         if (!File.Exists(registryPath)) return;
         var registry = JsonSerializer.Deserialize<ReferenceRegistry>(File.ReadAllText(registryPath), Json)
             ?? throw new InvalidDataException("The file reference registry is empty or invalid. Restore its backup before starting FIELD.");
         if (registry.Version != 1 || registry.References is null)
             throw new InvalidDataException("The file reference registry has an unsupported format.");
         var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var reference in registry.References)
+        foreach (var source in registry.References)
         {
-            if (reference is null || !Guid.TryParseExact(reference.ReferenceId, "N", out _) ||
-                string.IsNullOrWhiteSpace(reference.Path) || string.IsNullOrWhiteSpace(reference.FileName) ||
-                !System.IO.Path.IsPathFullyQualified(reference.Path) || reference.Size < 0 ||
-                !new[] { "available", "missing", "unavailable", "inaccessible", "unsupported", "replaced" }.Contains(reference.Status) ||
-                reference.Identity is { } identity && !ValidIdentity(identity) ||
-                !references.TryAdd(reference.ReferenceId, reference))
+            ValidateReference(source);
+            var reference = NormalizeReference(source);
+            if (!references.TryAdd(reference.ReferenceId, reference))
                 throw new InvalidDataException("The file reference registry contains an invalid or duplicate reference.");
-            var target = reference.Identity is { } stable
-                ? $"id:{stable.VolumeSerial}:{stable.FileId}:{stable.CreationTime}" : $"path:{reference.Path}";
+            var target = TargetKey(reference);
             if (!targets.Add(target)) throw new InvalidDataException("The file reference registry contains a duplicate file identity.");
         }
     }
 
     public void Dispose() => registryLock.Dispose();
 
+    internal static void ValidateReference(NativeReference? reference)
+    {
+        if (reference is null || !Guid.TryParseExact(reference.ReferenceId, "N", out _) ||
+            string.IsNullOrWhiteSpace(reference.Path) || reference.Path.Length > 32760 || reference.Path.Contains('\0') ||
+            string.IsNullOrWhiteSpace(reference.FileName) || reference.FileName.IndexOfAny(new[] { '\\', '/', '\0' }) >= 0 ||
+            !System.IO.Path.IsPathFullyQualified(reference.Path) || reference.Size < 0 || reference.Size > 9007199254740991 ||
+            !new[] { "available", "missing", "unavailable", "inaccessible", "unsupported", "replaced", "unresolved" }.Contains(reference.Status) ||
+            reference.Identity is { } identity && !ValidIdentity(identity))
+            throw new InvalidDataException("The file reference registry contains an invalid reference.");
+        if (reference.ModifiedUtc is not null &&
+            (!DateTimeOffset.TryParse(reference.ModifiedUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var modified) ||
+             modified.Offset != TimeSpan.Zero || !(reference.ModifiedUtc.EndsWith("Z", StringComparison.OrdinalIgnoreCase) || reference.ModifiedUtc.EndsWith("+00:00", StringComparison.Ordinal))))
+            throw new InvalidDataException("Invalid native file timestamp.");
+    }
+
+    internal static string TargetKey(NativeReference reference) => reference.Identity is { } identity
+        ? $"id:{identity.VolumeSerial.ToLowerInvariant()}:{identity.FileId.ToLowerInvariant()}:{long.Parse(identity.CreationTime, CultureInfo.InvariantCulture)}"
+        : "path:" + NormalizePath(reference.Path).ToLowerInvariant();
+
+    private static NativeReference NormalizeReference(NativeReference reference) => reference with
+    {
+        ReferenceId = reference.ReferenceId.ToLowerInvariant(),
+        Identity = reference.Identity is { } identity ? identity with
+        {
+            VolumeSerial = identity.VolumeSerial.ToLowerInvariant(),
+            FileId = identity.FileId.ToLowerInvariant(),
+            CreationTime = long.Parse(identity.CreationTime, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture)
+        } : null
+    };
+
+    private static string NormalizePath(string path)
+    {
+        path = path.Replace('/', '\\');
+        if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) path = @"\\" + path[8..];
+        else if (path.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase) && path.Length > 6 && path[5] == ':') path = path[4..];
+        return System.IO.Path.GetFullPath(path);
+    }
+
+    /// <summary>Restores native targets during browser-library import without reading file contents.</summary>
+    public IReadOnlyDictionary<string, string> Adopt(IEnumerable<NativeReference> imported)
+    {
+        var incoming = imported.ToArray();
+        foreach (var reference in incoming) ValidateReference(reference);
+        lock (gate)
+        {
+            var originals = new Dictionary<string, NativeReference>(references, StringComparer.Ordinal);
+            var mapped = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var changed = false;
+            try
+            {
+                foreach (var source in incoming)
+                {
+                    var reference = NormalizeReference(source);
+                    if (references.TryGetValue(reference.ReferenceId, out var sameId) &&
+                        !string.Equals(TargetKey(reference), TargetKey(sameId), StringComparison.Ordinal))
+                        throw new InvalidDataException("A native reference ID already belongs to another file.");
+                    var existing = references.Values.FirstOrDefault(candidate => TargetKey(candidate) == TargetKey(reference));
+                    if (existing is not null)
+                    {
+                        mapped[source.ReferenceId] = existing.ReferenceId;
+                        continue;
+                    }
+                    var probe = reference.Identity is { } identity
+                        ? NativeFileIdentity.Resolve(identity, reference.Path)
+                        : NativeFileIdentity.Inspect(reference.Path);
+                    var restored = FromProbe(reference.ReferenceId, probe, reference.Path, reference);
+                    // Path-only imports keep path semantics rather than silently claiming a new stable identity.
+                    if (reference.Identity is null) restored = restored with { Identity = null, Recoverable = false };
+                    references.Add(restored.ReferenceId, restored);
+                    mapped[source.ReferenceId] = restored.ReferenceId;
+                    changed = true;
+                }
+                if (changed) Save();
+                return mapped;
+            }
+            catch
+            {
+                references.Clear();
+                foreach (var (id, reference) in originals) references.Add(id, reference);
+                throw;
+            }
+        }
+    }
+
     private static bool ValidIdentity(FileIdentityRecord identity) =>
-        identity.VolumeSerial is not null && Regex.IsMatch(identity.VolumeSerial, "^[a-f0-9]{16}$") &&
-        identity.FileId is not null && Regex.IsMatch(identity.FileId, "^[a-f0-9]{32}$") &&
+        identity.VolumeSerial is not null && Regex.IsMatch(identity.VolumeSerial, "^[a-fA-F0-9]{16}$") &&
+        identity.FileId is not null && Regex.IsMatch(identity.FileId, "^[a-fA-F0-9]{32}$") &&
         identity.VolumePath is not null && System.IO.Path.IsPathFullyQualified(identity.VolumePath) &&
         identity.CreationTime is not null && long.TryParse(identity.CreationTime, NumberStyles.None, CultureInfo.InvariantCulture, out var creation) && creation >= 0;
 
@@ -85,7 +171,7 @@ public sealed class FileReferenceService : IDisposable
             var result = new List<NativeReference>();
             var originals = new Dictionary<string, NativeReference>(StringComparer.Ordinal);
             var changed = false;
-            foreach (var id in ids.Distinct(StringComparer.Ordinal))
+            foreach (var id in ids.Select(id => id.ToLowerInvariant()).Distinct(StringComparer.Ordinal))
             {
                 if (!references.TryGetValue(id, out var previous))
                 {
@@ -121,6 +207,7 @@ public sealed class FileReferenceService : IDisposable
     public void Open(string id)
     {
         if (!Guid.TryParseExact(id, "N", out _)) throw new ArgumentException("Unknown file reference.");
+        id = id.ToLowerInvariant();
         lock (gate)
         {
             if (!references.ContainsKey(id)) throw new KeyNotFoundException("Relink this file.");

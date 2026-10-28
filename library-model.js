@@ -279,6 +279,22 @@
       return record;
     }
 
+    deleteField(id) {
+      const field = this._fieldById.get(identifier(id, 'Field ID'));
+      if (!field) throw new Error('Field does not exist.');
+      const children = this.fields.filter(candidate => candidate.parent === id);
+      const removedConnections = this.connections.filter(connection => connection.from === id || connection.to === id);
+      // Removing a field only changes its organization. Canonical items and their file identities stay intact.
+      for (const child of children) child.parent = field.parent;
+      for (const memberships of this._memberships.values()) memberships.delete(id);
+      for (let index = this.connections.length - 1; index >= 0; index--) {
+        if (this.connections[index].from === id || this.connections[index].to === id) this.connections.splice(index, 1);
+      }
+      this.fields.splice(this.fields.indexOf(field), 1);
+      this._fieldById.delete(id);
+      return { fieldId: id, parentId: field.parent, children: children.map(child => child.id), removedConnections: removedConnections.map(connection => connection.id) };
+    }
+
     createItem(source, fieldIds) {
       const record = itemRecord(source);
       const uniqueFields = this._fieldIds(fieldIds);

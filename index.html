@@ -6,13 +6,17 @@
   <meta name="theme-color" content="#0e1116">
   <title>FIELD</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23171b22'/%3E%3Ctext x='10' y='30' font-family='Arial' font-weight='bold' font-size='30' fill='white'%3EF%3C/text%3E%3Ccircle cx='31' cy='9' r='4' fill='%2380d754'/%3E%3C/svg%3E">
+  <script src="desktop-client.js"></script>
   <script src="appearance.js"></script>
   <link rel="preload" href="assets/fonts/dm-sans-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
   <script src="drawing.js" defer></script>
   <script src="library-model.js" defer></script>
+  <script src="library-transfer.js" defer></script>
   <script src="library-storage.js" defer></script>
   <script src="native-client.js" defer></script>
+  <script src="context-menu.js" defer></script>
+  <script src="map-geometry.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -28,7 +32,7 @@
       <button class="theme-toggle" id="theme-toggle" aria-label="Switch theme"></button>
     </div>
   </aside>
-  <main id="main"><div class="content" id="content"></div></main>
+  <main id="main"><div class="content" id="content" tabindex="-1"></div></main>
   <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
   <aside class="detail-panel" id="detail-panel" aria-label="Item details" hidden></aside>
   <div id="toast" role="status"></div>
