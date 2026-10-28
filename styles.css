@@ -325,3 +325,9 @@ input[type='color']:focus-visible, .swatch:focus-visible {
   .overview-toolbar .header-actions { gap: 4px; }
   .overview-toolbar .header-actions .button { padding-inline: 8px; }
 }
+
+/* Preview placeholders retain a measurable area for lazy loading. */
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
+.item-thumbnail[data-image-preview][hidden], .detail-image[data-image-preview][hidden] { display: block; visibility: hidden; }
+.detail-image[data-image-preview] { min-height: 100px; object-fit: contain; }

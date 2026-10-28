@@ -11,12 +11,12 @@ powershell -NoProfile -File scripts/package-windows.ps1
 The script uses `desktop/global.json`, publishes a self-contained `win-x64` application, copies an explicit list of UI assets into `web/`, includes dependency notices, validates asset hashes and bundled runtime files, and produces:
 
 ```text
-dist/FIELD-0.1.1-alpha-win-x64/FIELD.exe
-dist/FIELD-0.1.1-alpha-win-x64.zip
-dist/FIELD-0.1.1-alpha-win-x64.zip.sha256
+dist/FIELD-0.1.2-alpha-win-x64/FIELD.exe
+dist/FIELD-0.1.2-alpha-win-x64.zip
+dist/FIELD-0.1.2-alpha-win-x64.zip.sha256
 ```
 
-Version `0.1.1-alpha` pins .NET runtime `10.0.14`, which was verified as present in Microsoft's official NuGet feeds for both the [core runtime](https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.14) and [Windows desktop runtime](https://www.nuget.org/packages/Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.14). The SDK and WebView2 SDK versions are selected by the desktop project. The package includes neither the user's library nor browser profile. Only the allowlisted web files are copied; source, tests, native-service files, and local data are excluded.
+Version `0.1.2-alpha` pins .NET runtime `10.0.14`, which was verified as present in Microsoft's official NuGet feeds for both the [core runtime](https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.14) and [Windows desktop runtime](https://www.nuget.org/packages/Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.14). The SDK and WebView2 SDK versions are selected by the desktop project. The package includes neither the user's library nor browser profile. Only the allowlisted web files are copied; source, tests, native-service files, and local data are excluded.
 
 Use `-Version 0.1.2-alpha` for a new package. Use `-Force` to replace a same-version build while retaining prior outputs with `.previous-*` names. Failed build directories remain under `dist/.build-*` for inspection; the script performs no recursive deletes. `-OutputRoot` can select a dedicated output directory. `-RuntimeVersion` selects another available stable .NET 10 servicing release.
 
@@ -26,4 +26,4 @@ App data is owned by FIELD at `%LOCALAPPDATA%\FIELD\Desktop`. The native catalog
 
 The desktop alpha is unsigned and has no automatic updater or installer. To update it, close FIELD, extract a new package into a separate folder, and run its executable. Keep the old app folder until the new build opens the library successfully.
 
-`scripts/create-icon.ps1` regenerates `desktop/Field.Desktop/field.ico` from geometric shapes matching the source `field-icon.svg`. The original full FIELD wordmark used by the interface is unchanged.
+`scripts/create-icon.ps1` generates the Windows icon sizes from the supplied `assets/app-icon.png`. The original full FIELD wordmark used by the interface is unchanged.

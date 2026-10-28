@@ -22,12 +22,12 @@ internal sealed partial class FieldWindow : Window
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly HashSet<string> Methods = new(StringComparer.Ordinal)
     {
-        "app.info", "app.theme", "files.track", "files.resolve", "files.pick", "files.open", "library.load", "library.save", "library.import", "library.pickImport"
+        "app.info", "app.theme", "files.track", "files.resolve", "files.pick", "files.open", "files.preview", "library.load", "library.save", "library.import", "library.pickImport"
     };
     private static readonly HashSet<string> Assets = new(StringComparer.Ordinal)
     {
         "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-storage.js",
-        "/desktop-client.js", "/library-transfer.js", "/context-menu.js", "/map-geometry.js", "/native-client.js", "/app.js", "/assets/field-logo.png",
+        "/desktop-client.js", "/library-transfer.js", "/context-menu.js", "/map-geometry.js", "/image-previews.js", "/assets/app-icon.png", "/native-client.js", "/app.js", "/assets/field-logo.png",
         "/assets/fonts/dm-sans-latin-variable.woff2", "/assets/fonts/OFL.txt"
     };
     private readonly DesktopOptions options;
@@ -215,7 +215,14 @@ internal sealed partial class FieldWindow : Window
             {
                 if (closing) return;
                 var owner = new WindowInteropHelper(this).Handle;
-                var result = await Task.Run(() => backend.HandleAsync(method, parameters, owner));
+                var result = await Task.Run(async () => {
+                    if (method != "files.preview") return await backend.HandleAsync(method, parameters, owner);
+                    if (!parameters.TryGetProperty("referenceId", out var refId) || refId.ValueKind != JsonValueKind.String || !Guid.TryParseExact(refId.GetString(), "N", out _))
+                        throw new ArgumentException("Unknown file reference.");
+                    var resolved = await backend.HandleAsync("files.resolve", JsonSerializer.SerializeToElement(new { referenceIds = new[] { refId.GetString() } }));
+                    var reference = JsonSerializer.SerializeToElement(resolved, Json).GetProperty("references")[0].Deserialize<NativeReference>(Json)!;
+                    return ImagePreview.Create(reference);
+                });
                 Reply(version, new { id, ok = true, result });
             }
             finally { operations.Release(); }

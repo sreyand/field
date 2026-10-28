@@ -27,7 +27,7 @@ public sealed class DesktopBackend : IDisposable
             if (args.ValueKind != JsonValueKind.Object) throw new ArgumentException("Request parameters must be an object.");
             switch (method)
             {
-                case "app.info": return new { app = "FIELD", version = "0.1.0-alpha", platform = "windows", storage = "native" };
+                case "app.info": return new { app = "FIELD", version = "0.1.2-alpha", platform = "windows", storage = "native" };
                 case "files.track": return new { reference = files.Track(Text(args, "path")) };
                 case "files.resolve":
                     if (!args.TryGetProperty("referenceIds", out var ids) || ids.ValueKind != JsonValueKind.Array || ids.GetArrayLength() > 500)

@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $absoluteOutput = [System.IO.Path]::GetFullPath($OutputPath)
 [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($absoluteOutput)) | Out-Null
+$source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot '..\assets\app-icon.png'))
 $sizes = @(16, 32, 48, 64, 128, 256)
 $frames = [System.Collections.Generic.List[byte[]]]::new()
 foreach ($size in $sizes) {
@@ -16,14 +17,9 @@ foreach ($size in $sizes) {
     $green = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#80d754'))
     $memory = [System.IO.MemoryStream]::new()
     try {
-        $graphics.Clear([System.Drawing.ColorTranslator]::FromHtml('#101215'))
-        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $scale = [single]($size / 32.0)
-        $graphics.ScaleTransform($scale, $scale)
-        $graphics.FillRectangle($white, [single]7, [single]6, [single]4, [single]21)
-        $graphics.FillRectangle($white, [single]7, [single]6, [single]15, [single]4)
-        $graphics.FillRectangle($white, [single]7, [single]14, [single]11, [single]4)
-        $graphics.FillEllipse($green, [single]23, [single]4, [single]6, [single]6)
+        $graphics.Clear([System.Drawing.Color]::White)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.DrawImage($source, 0, 0, $size, $size)
         $bitmap.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
         $frames.Add($memory.ToArray())
     }
@@ -62,3 +58,5 @@ finally {
     $stream.Dispose()
 }
 Write-Output $absoluteOutput
+
+$source.Dispose()

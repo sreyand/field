@@ -4,8 +4,8 @@ if exist "%~dp0FIELD.exe" (
   start "" "%~dp0FIELD.exe"
   exit /b 0
 )
-if exist "%~dp0dist\FIELD-0.1.1-alpha-win-x64\FIELD.exe" (
-  start "" "%~dp0dist\FIELD-0.1.1-alpha-win-x64\FIELD.exe"
+if exist "%~dp0dist\FIELD-0.1.2-alpha-win-x64\FIELD.exe" (
+  start "" "%~dp0dist\FIELD-0.1.2-alpha-win-x64\FIELD.exe"
   exit /b 0
 )
 if exist "%~dp0dist\FIELD-0.1.0-alpha-win-x64\FIELD.exe" (

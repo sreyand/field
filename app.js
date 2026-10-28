@@ -272,6 +272,7 @@ function render() {
   renderSidebar();
   $('#content').innerHTML = view === 'field' ? renderField() : view === 'everything' ? renderEverything() : renderFields();
   if (view === 'everything' && everythingMode === 'map' && fields.length) initMap();
+  window.FieldPreviews.observe(items);
 }
 
 function renderFieldRow(field) {
@@ -288,13 +289,21 @@ function renderFilters() {
   return `<div class="item-toolbar" aria-label="Filter items">${[['all', 'All'], ...Object.entries(kinds).map(([key, value]) => [key, value.plural])].map(([key, label]) => `<button class="filter-button ${itemFilter === key ? 'active' : ''}" data-action="filter" data-kind="${key}">${label}</button>`).join('')}</div>`;
 }
 
+function imagePreview(item, detail = false) {
+  if (item.kind !== 'file') return '';
+  const attached = attachments.get(item.id);
+  const className = detail ? 'detail-image' : 'item-thumbnail';
+  if (attached && item.mime?.startsWith('image/')) return `<img class="${className}" src="${attached.url}" alt="${detail ? escapeHTML(item.title) : ''}">`;
+  return window.FieldPreviews.supported(item) ? `<img class="${className}" data-image-preview="${item.id}" alt="${detail ? escapeHTML(item.title) : ''}" hidden>` : '';
+}
+
 function renderItem(item) {
   const meta = kinds[item.kind];
   const notePreview = item.kind === 'note' ? (item.body === item.title ? '' : item.body.startsWith(item.title + '\n') ? item.body.slice(item.title.length + 1) : item.body) : '';
   const extra = item.kind === 'link' ? new URL(item.url).hostname : item.kind === 'file' ? (item.path || (item.fileName !== item.title ? item.fileName : '') || '') : '';
   const description = notePreview || extra;
   const metadata = (description ? `<span class="item-description">${escapeHTML(description.replace(/\s+/g, ' ').slice(0, 350))}</span>` : '') + (item.kind === 'file' ? fileStatus(item) + (item.size !== undefined ? `<span class="file-size">${formatSize(item.size)}</span>` : '') : '');
-  return `<button class="entry-row item-row" data-action="open-item" data-id="${item.id}"><span class="entry-icon">${icon(meta.icon)}</span><span class="sr-only">${meta.label}: </span><span class="entry-content"><span class="entry-heading"><strong class="entry-name" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</strong>${item.fields.length > 1 ? `<span class="membership-count">${icon('link')}<span>${item.fields.length}<span class="sr-only"> fields</span></span></span>` : ''}</span>${metadata ? `<span class="entry-meta">${metadata}</span>` : ''}</span>${item.kind === 'drawing' ? `<img class="item-thumbnail" src="${item.drawing}" alt="">` : ''}</button>`;
+  return `<button class="entry-row item-row" data-action="open-item" data-id="${item.id}"><span class="entry-icon">${icon(meta.icon)}</span><span class="sr-only">${meta.label}: </span><span class="entry-content"><span class="entry-heading"><strong class="entry-name" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</strong>${item.fields.length > 1 ? `<span class="membership-count">${icon('link')}<span>${item.fields.length}<span class="sr-only"> fields</span></span></span>` : ''}</span>${metadata ? `<span class="entry-meta">${metadata}</span>` : ''}</span>${item.kind === 'drawing' ? `<img class="item-thumbnail" src="${item.drawing}" alt="">` : imagePreview(item)}</button>`;
 }
 
 function renderItems(list) {
@@ -600,12 +609,13 @@ function openItem(id) {
   openItemId = id;
   const file = attachments.get(id);
   const meta = kinds[item.kind];
-  let body = item.kind === 'note' ? `<div class="detail-body">${escapeHTML(item.body)}</div>` : item.kind === 'drawing' ? `<img class="detail-drawing" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : item.kind === 'link' ? `<a class="detail-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.url)}</a>` : `${file && item.mime?.startsWith('image/') ? `<img class="detail-image" src="${file.url}" alt="${escapeHTML(item.title)}">` : ''}${item.path ? `<div class="detail-path">${escapeHTML(item.path)}</div>` : `<div class="detail-path">${escapeHTML(item.fileName)}</div>`}${item.size !== undefined ? `<div class="detail-metadata">${formatSize(item.size)}</div>` : ''}`;
+  let body = item.kind === 'note' ? `<div class="detail-body">${escapeHTML(item.body)}</div>` : item.kind === 'drawing' ? `<img class="detail-drawing" src="${item.drawing}" alt="${escapeHTML(item.title)}">` : item.kind === 'link' ? `<a class="detail-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(item.url)}</a>` : `${imagePreview(item, true)}${item.path ? `<div class="detail-path">${escapeHTML(item.path)}</div>` : `<div class="detail-path">${escapeHTML(item.fileName)}</div>`}${item.size !== undefined ? `<div class="detail-metadata">${formatSize(item.size)}</div>` : ''}`;
   const openAction = item.kind === 'link' ? `<a class="button secondary compact" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">${icon('external')}Open</a>` : item.kind === 'file' ? (file ? `<a class="button secondary compact" href="${file.url}" target="_blank" rel="noopener">${icon('external')}Open file</a>` : '') + (item.path ? button('Copy path', 'copy-path', 'secondary compact', `data-id="${id}"`, 'copy') : '') : item.kind === 'drawing' ? `<a class="button secondary compact" href="${item.drawing}" download="${escapeHTML(item.title.replace(/[^a-z0-9_-]/gi, '_'))}.png">Save PNG</a>` : '';
   const nativeActions = item.kind === 'file' && item.native ? button('Open file', 'open-native-file', 'secondary compact', `data-id="${id}" ${fileState(item).status !== 'available' ? 'disabled' : ''}`, 'external') : '';
   const relinkAction = item.kind === 'file' ? button(item.native ? 'Relink' : native.available ? 'Track file' : 'Reconnect', 'relink-file', 'secondary compact', `data-id="${id}"`) : '';
   $('#detail-panel').innerHTML = `<div class="detail-top"><span>${icon(meta.icon)}${meta.label}</span><button class="icon-button" data-action="close-detail" aria-label="Close item">${icon('close')}</button></div><h2>${escapeHTML(item.title)}</h2>${body}${item.kind === 'file' ? fileStatus(item, true) : ''}<div class="detail-actions">${nativeActions}${openAction}${button('Edit', 'edit-item', 'secondary compact', `data-id="${id}"`)}${relinkAction}</div><div class="detail-fields-title"><span>Fields</span>${button('Manage', 'share-item', 'quiet compact', `data-id="${id}"`)}</div><div class="membership-list">${item.fields.map(fieldId => `<button data-action="open-field" data-id="${fieldId}" style="--field-color:${byField(fieldId).color}"><span class="field-dot"></span>${escapeHTML(fieldPath(fieldId))}<span class="membership-arrow">↗</span></button>`).join('') || '<div class="blank-message">No fields</div>'}</div>`;
   $('#detail-panel').hidden = false;
+  window.FieldPreviews.observe(items);
 }
 
 function closeDetail() {

@@ -1,6 +1,6 @@
 # FIELD — Windows alpha
 
-Extract `dist/FIELD-0.1.1-alpha-win-x64.zip` and double-click **FIELD.exe**, or use **Open FIELD.cmd** from this checkout after building the package. FIELD opens in its own Windows window. No .NET SDK or separate .NET installation is required to run the portable package.
+Extract `dist/FIELD-0.1.2-alpha-win-x64.zip` and double-click **FIELD.exe**, or use **Open FIELD.cmd** from this checkout after building the package. FIELD opens in its own Windows window. No .NET SDK or separate .NET installation is required to run the portable package.
 
 The package targets 64-bit Windows and uses the Microsoft Edge WebView2 Evergreen Runtime. It is already installed on this development machine. A missing-runtime message links to Microsoft's installer. This first alpha is unsigned.
 
@@ -35,3 +35,5 @@ dotnet run --project tests/backend/Field.BackendSmoke.csproj -- "C:\absolute\dis
 ```
 
 The legacy HTTP prototype remains under `native/` for browser migration and development. Its command-line build requires the .NET 8 SDK; the packaged desktop app uses its native bridge directly and does not start that HTTP service.
+
+Image files show lazy thumbnails and a larger preview in the details panel. Desktop previews read registered local files, stay out of the saved catalogue, and use a bounded memory cache. Unsupported, missing, corrupt, and oversized images retain their file controls. The app icon is generated from assets/app-icon.png.
