@@ -22,7 +22,7 @@ internal sealed partial class FieldWindow : Window
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly HashSet<string> Methods = new(StringComparer.Ordinal)
     {
-        "app.info", "app.theme", "files.track", "files.resolve", "files.pick", "files.open", "files.preview", "library.load", "library.save", "library.import", "library.pickImport", "folders.pick", "folders.attach", "folders.sync", "folders.detach", "library.search", "library.backups", "library.restore"
+        "app.info", "app.theme", "app.ready", "files.track", "files.resolve", "files.pick", "files.open", "files.preview", "library.load", "library.save", "library.import", "library.pickImport", "folders.pick", "folders.attach", "folders.sync", "folders.detach", "library.search", "library.backups", "library.restore"
     };
     private static readonly HashSet<string> Assets = new(StringComparer.Ordinal)
     {
@@ -34,7 +34,8 @@ internal sealed partial class FieldWindow : Window
     private readonly DesktopBackend backend;
     private readonly WebView2 web = new();
     private readonly Grid layout = new();
-    private readonly TextBlock loading = new() { Text = "Opening FIELD…", FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly StartupView loading;
+    private bool interfaceReady;
     private readonly SemaphoreSlim operations = new(1, 1);
     private readonly HashSet<string> outstanding = new(StringComparer.Ordinal);
     private bool closing;
@@ -45,6 +46,7 @@ internal sealed partial class FieldWindow : Window
     {
         this.options = options;
         this.backend = backend;
+        loading = new StartupView(Path.Combine(options.AssetsDirectory, "assets", "field-logo.png"));
         Title = "FIELD";
         Width = 1280;
         Height = 820;
@@ -108,18 +110,17 @@ internal sealed partial class FieldWindow : Window
                 if (closing) return;
                 if (!args.IsSuccess)
                 {
-                    loading.Text = "FIELD could not load its interface. Close and reopen the app.";
-                    loading.Visibility = Visibility.Visible;
+                    web.Visibility = Visibility.Hidden;
+                    loading.ShowError("FIELD could not load its interface. Close and reopen the app.");
                     return;
                 }
-                loading.Visibility = Visibility.Collapsed;
-                web.Visibility = Visibility.Visible;
+                if (interfaceReady) { loading.Visibility = Visibility.Collapsed; web.Visibility = Visibility.Visible; }
             };
             core.ProcessFailed += (_, args) =>
             {
                 if (closing) return;
-                loading.Text = "FIELD's interface stopped. Close and reopen the app.";
-                loading.Visibility = Visibility.Visible;
+                web.Visibility = Visibility.Hidden;
+                loading.ShowError("FIELD's interface stopped. Close and reopen the app.");
             };
             core.Navigate(ApplicationUri);
         }
@@ -201,6 +202,14 @@ internal sealed partial class FieldWindow : Window
                 throw new ArgumentException("Unknown FIELD operation.");
             var parameters = message.TryGetProperty("params", out var value) ? value.Clone() : JsonSerializer.SerializeToElement(new { });
             if (parameters.ValueKind != JsonValueKind.Object) throw new ArgumentException("Invalid operation parameters.");
+            if (method == "app.ready")
+            {
+                interfaceReady = true;
+                loading.Visibility = Visibility.Collapsed;
+                web.Visibility = Visibility.Visible;
+                Reply(version, new { id, ok = true, result = new { } });
+                return;
+            }
             if (method == "app.theme")
             {
                 if (!parameters.TryGetProperty("theme", out var preference) || preference.ValueKind != JsonValueKind.String || preference.GetString() is not ("dark" or "light"))
@@ -281,6 +290,7 @@ internal sealed partial class FieldWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        loading.Stop();
         IsEnabled = false;
         // WPF must finish cancelling this Closing event before Close can be called again.
         // WaitAsync can complete synchronously when no native operation is running.
@@ -302,6 +312,7 @@ internal sealed partial class FieldWindow : Window
 
     private void ApplyTheme(bool dark)
     {
+        loading.SetTheme(dark);
         Background = new SolidColorBrush(dark ? Color.FromRgb(16, 18, 21) : Color.FromRgb(252, 252, 250));
         var enabled = dark ? 1 : 0;
         _ = DwmSetWindowAttribute(new WindowInteropHelper(this).Handle, 20, ref enabled, sizeof(int));

@@ -11,12 +11,12 @@ powershell -NoProfile -File scripts/package-windows.ps1
 The script uses `desktop/global.json`, publishes a self-contained `win-x64` application, copies an explicit list of UI assets into `web/`, includes dependency notices, validates asset hashes and bundled runtime files, and produces:
 
 ```text
-dist/FIELD-0.2.0-alpha-win-x64/FIELD.exe
-dist/FIELD-0.2.0-alpha-win-x64.zip
-dist/FIELD-0.2.0-alpha-win-x64.zip.sha256
+dist/FIELD-0.2.1-alpha-win-x64/FIELD.exe
+dist/FIELD-0.2.1-alpha-win-x64.zip
+dist/FIELD-0.2.1-alpha-win-x64.zip.sha256
 ```
 
-Version `0.2.0-alpha` pins .NET runtime `10.0.14`, which was verified as present in Microsoft's official NuGet feeds for both the [core runtime](https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.14) and [Windows desktop runtime](https://www.nuget.org/packages/Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.14). The SDK and WebView2 SDK versions are selected by the desktop project. The package includes neither the user's library nor browser profile. Only the allowlisted web files are copied; source, tests, native-service files, and local data are excluded.
+Version `0.2.1-alpha` pins .NET runtime `10.0.14`, which was verified as present in Microsoft's official NuGet feeds for both the [core runtime](https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.14) and [Windows desktop runtime](https://www.nuget.org/packages/Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.14). The SDK and WebView2 SDK versions are selected by the desktop project. The package includes neither the user's library nor browser profile. Only the allowlisted web files are copied; source, tests, native-service files, and local data are excluded.
 
 Use `-Version 0.2.1-alpha` for a new package. Use `-Force` to replace a same-version build while retaining prior outputs with `.previous-*` names. Failed build directories remain under `dist/.build-*` for inspection; the script performs no recursive deletes. `-OutputRoot` can select a dedicated output directory. `-RuntimeVersion` selects another available stable .NET 10 servicing release.
 

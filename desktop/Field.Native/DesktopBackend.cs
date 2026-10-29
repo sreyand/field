@@ -29,7 +29,7 @@ public sealed class DesktopBackend : IDisposable
             if (args.ValueKind != JsonValueKind.Object) throw new ArgumentException("Request parameters must be an object.");
             switch (method)
             {
-                case "app.info": return new { app = "FIELD", version = "0.2.0-alpha", platform = "windows", storage = "native" };
+                case "app.info": return new { app = "FIELD", version = "0.2.1-alpha", platform = "windows", storage = "native" };
                 case "folders.attach": return folders.Attach(Text(args, "fieldId"), Text(args, "path"), Revision(args));
                 case "folders.detach": return folders.Detach(Text(args, "fieldId"), Revision(args));
                 case "folders.sync": return folders.Sync(Revision(args), args.TryGetProperty("force", out var force) && force.ValueKind == JsonValueKind.True);

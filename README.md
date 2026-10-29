@@ -1,6 +1,6 @@
 # FIELD — Windows alpha 0.2.0
 
-Close older FIELD builds, then run `dist/FIELD-0.2.0-alpha-win-x64/FIELD.exe`, or use `Open FIELD.cmd`. Extract the complete ZIP when moving the application. The portable x64 package includes .NET; WebView2 Evergreen Runtime is required.
+Close older FIELD builds, then run `dist/FIELD-0.2.1-alpha-win-x64/FIELD.exe`, or use `Open FIELD.cmd`. Extract the complete ZIP when moving the application. The portable x64 package includes .NET; WebView2 Evergreen Runtime is required.
 
 ## Catalogue and migration
 

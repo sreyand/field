@@ -4,7 +4,7 @@
   const webview = window.chrome?.webview;
   const isDesktop = Boolean(webview && location.origin === 'https://field.local');
   const pending = new Map();
-  const methods = new Set(['app.info', 'app.theme', 'files.track', 'files.resolve', 'files.pick', 'files.open', 'files.preview', 'library.load', 'library.save', 'library.import', 'library.pickImport', 'folders.pick', 'folders.attach', 'folders.sync', 'folders.detach', 'library.search', 'library.backups', 'library.restore']);
+  const methods = new Set(['app.info', 'app.theme', 'app.ready', 'files.track', 'files.resolve', 'files.pick', 'files.open', 'files.preview', 'library.load', 'library.save', 'library.import', 'library.pickImport', 'folders.pick', 'folders.attach', 'folders.sync', 'folders.detach', 'library.search', 'library.backups', 'library.restore']);
 
   function request(method, params = {}, timeout = 15000) {
     if (!isDesktop) return Promise.reject(new Error('The FIELD desktop app is not connected.'));

@@ -86,6 +86,7 @@ async function initializeLibrary() {
     storageError = error.message;
   }
   render();
+  if (window.FieldDesktop?.isDesktop) window.FieldDesktop.request('app.ready').catch(() => {});
   await native.ready;
   syncFileReferences();
 }

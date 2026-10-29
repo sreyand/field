@@ -7,8 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>FIELD</AssemblyName>
     <RootNamespace>Field.Desktop</RootNamespace>
-    <Version>0.2.0-alpha</Version>
-    <FileVersion>0.2.0.0</FileVersion>
+    <Version>0.2.1-alpha</Version>
+    <FileVersion>0.2.1.0</FileVersion>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <Product>FIELD</Product>
     <Description>FIELD personal archive</Description>
