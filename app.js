@@ -132,7 +132,9 @@ function renderFileChanges() {
 
 async function syncFileReferences(force = false) {
   if (!isReady || isSaving || nativeBusy || syncingFiles || fileSyncPaused || $('#modal').open || quickMenu.isOpen || dragged || document.hidden && !force) return;
-  const tracked = items.filter(item => item.kind === 'file' && item.native);
+  const visibleIds = new Set([...document.querySelectorAll('.item-row[data-id]')].map(node => node.dataset.id));
+  if (openItemId) visibleIds.add(openItemId);
+  const tracked = items.filter(item => item.kind === 'file' && item.native && (items.length <= 250 || visibleIds.has(item.id)));
   if (!tracked.length) return;
   syncingFiles = true;
   try {

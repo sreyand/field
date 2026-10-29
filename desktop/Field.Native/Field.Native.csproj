@@ -6,6 +6,8 @@
     <RootNamespace>Field.Native</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <Compile Include="../../native/NativeFileIdentity.cs" Link="NativeFileIdentity.cs" />
     <Compile Include="../../native/FileReferenceService.cs" Link="FileReferenceService.cs" />
     <Compile Include="../../native/NativeFilePicker.cs" Link="NativeFilePicker.cs" />

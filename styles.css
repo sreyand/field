@@ -329,5 +329,26 @@ input[type='color']:focus-visible, .swatch:focus-visible {
 /* Preview placeholders retain a measurable area for lazy loading. */
 html { scrollbar-width: none; }
 html::-webkit-scrollbar { display: none; }
+.tree-row { display: flex; align-items: center; padding-left: calc(var(--depth) * 14px); min-width: 0; }
+.field-navigation .tree-toggle { width: 22px; min-width: 22px; min-height: 34px; padding: 4px; display: grid; place-items: center; }
+.tree-toggle .icon { width: 12px; height: 12px; }
+.tree-spacer { flex: 0 0 22px; }
+.field-navigation .tree-name { flex: 1; width: auto; min-width: 0; padding: 8px 4px; gap: 10px; }
+.field-navigation .tree-name .field-dot { margin: 0; }
+.selectable-item { display: flex; align-items: center; gap: 0; }
+.selectable-item.selected { background: var(--hover); }
+.selectable-item .item-row { flex: 1; width: 0; }
+.item-select { flex: 0 0 14px; width: 14px; height: 14px; margin: 0 2px 0 10px; accent-color: var(--accent); opacity: 0; }
+.selectable-item:hover .item-select, .selectable-item:focus-within .item-select, .item-select:checked { opacity: 1; }
+.bulk-toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; min-height: 32px; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+.bulk-toolbar label { display: flex; align-items: center; gap: 8px; }
+.bulk-toolbar input { accent-color: var(--accent); }
+.bulk-toolbar button, .folder-source button { padding: 5px 8px; font-size: 12px; }
+.bulk-toolbar button:hover, .folder-source button:hover { background: var(--hover); }
+.folder-source { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: -8px 0 20px; }
+.folder-source > span:first-child { display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; max-width: 65%; white-space: nowrap; }
+.folder-source .icon { width: 14px; height: 14px; }
+.folder-status { color: var(--error); }
+@media (hover: none) { .item-select { opacity: 1; } }
 .item-thumbnail[data-image-preview][hidden], .detail-image[data-image-preview][hidden] { display: block; visibility: hidden; }
 .detail-image[data-image-preview] { min-height: 100px; object-fit: contain; }

@@ -164,6 +164,41 @@ public sealed class FileReferenceService : IDisposable
         }
     }
 
+    /// <summary>Registers a complete folder scan with one durable registry write and indexed identity matching.</summary>
+    public IReadOnlyList<NativeReference> TrackMany(IEnumerable<string> paths)
+    {
+        lock (gate)
+        {
+            var original = new Dictionary<string, NativeReference>(references, StringComparer.Ordinal);
+            var targets = references.Values.ToDictionary(TargetKey, value => value, StringComparer.OrdinalIgnoreCase);
+            var pathOnly = references.Values.Where(value => value.Identity is null).ToDictionary(value => NormalizePath(value.Path), value => value, StringComparer.OrdinalIgnoreCase);
+            var result = new List<NativeReference>();
+            try
+            {
+                foreach (var path in paths)
+                {
+                    var probe = NativeFileIdentity.Inspect(path);
+                    if (probe.Status != "available" || string.IsNullOrWhiteSpace(probe.Path)) continue;
+                    var provisional = FromProbe("", probe, path, null);
+                    targets.TryGetValue(TargetKey(provisional), out var existing);
+                    if (existing is null) pathOnly.TryGetValue(NormalizePath(probe.Path), out existing);
+                    var updated = FromProbe(existing?.ReferenceId ?? Guid.NewGuid().ToString("N"), probe, existing?.Path ?? path, existing);
+                    references[updated.ReferenceId] = updated;
+                    targets[TargetKey(updated)] = updated;
+                    result.Add(updated);
+                }
+                if (references.Count != original.Count || result.Any(record => !original.TryGetValue(record.ReferenceId, out var previous) || previous != record)) Save();
+                return result;
+            }
+            catch
+            {
+                references.Clear();
+                foreach (var pair in original) references.Add(pair.Key, pair.Value);
+                throw;
+            }
+        }
+    }
+
     public IReadOnlyList<NativeReference> Resolve(IEnumerable<string> ids)
     {
         lock (gate)

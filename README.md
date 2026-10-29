@@ -1,39 +1,44 @@
-# FIELD — Windows alpha
+# FIELD — Windows alpha 0.2.0
 
-Extract `dist/FIELD-0.1.2-alpha-win-x64.zip` and double-click **FIELD.exe**, or use **Open FIELD.cmd** from this checkout after building the package. FIELD opens in its own Windows window. No .NET SDK or separate .NET installation is required to run the portable package.
+Close older FIELD builds, then run `dist/FIELD-0.2.0-alpha-win-x64/FIELD.exe`, or use `Open FIELD.cmd`. Extract the complete ZIP when moving the application. The portable x64 package includes .NET; WebView2 Evergreen Runtime is required.
 
-The package targets 64-bit Windows and uses the Microsoft Edge WebView2 Evergreen Runtime. It is already installed on this development machine. A missing-runtime message links to Microsoft's installer. This first alpha is unsigned.
+## Catalogue and migration
 
-Fresh desktop libraries are empty. Your catalogue is saved in `%LOCALAPPDATA%\FIELD\Desktop\library.json`; registered file identities are in `file-references.json`. The WebView profile in the same folder stores appearance preferences. Replacing or moving the program folder leaves this app-owned data in place. Closing the window shuts down FIELD; launching again focuses the existing window when it is already open.
+FIELD stores its catalogue in `%LOCALAPPDATA%\FIELD\Desktop\library.sqlite`. Existing `library.json` catalogues migrate on first launch with canonical IDs, shared memberships, custom names, notes, drawings, and relationships intact. The original JSON and a migration backup are retained. Older builds keep reading the old JSON copy: use 0.2.0 for further editing after migration.
 
-To bring over an existing browser library:
+SQLite indexes fields, file identities and paths, memberships, relationships, and full-text search. Writes update changed records in a transaction. The current frontend still exchanges complete snapshots and limits a catalogue/export to 64 MB; this is a foundation for larger archives, not an unlimited-scale claim. Item lists render 100 rows at a time with Show more.
 
-1. Open the original `index.html` in the same browser and location you used previously, or use **Open FIELD browser.cmd**.
-2. Open **Library → Export library** and save the JSON file.
-3. Open the desktop app, then **Library → Import library** and choose that export.
+## Linked folders
 
-Import is available for an empty desktop library and preserves canonical item IDs, field memberships, hierarchy, connections, notes, links, drawings, and native file references. The original browser library is kept. Invalid exports and existing desktop libraries are not overwritten. The alpha import limit is 64 MB. Selected files remain references to their original locations; exporting the catalogue does not copy those file contents.
+Use **Link folder** on Fields, or right-click a field and choose **Link folder**. Files in that folder and its subfolders appear in the field. Refresh runs while FIELD is open using file-change notifications, a five-second UI check, and a periodic reconciliation. Changes pause while editing, selecting items, or a native operation is running. Use **Refresh** for an immediate check.
 
-Fields, subfields, links, files, notes, drawings, shared references, connections, basic search, native file selection/opening, and same-volume NTFS rename/move tracking are included. Use **Relink** for cross-volume moves or unavailable targets. File status and relinking preserve the item and its memberships. The interface uses local DM Sans, dark/light themes, and compact borderless rows.
+Original PC files are never moved or deleted by linking, unlinking, organizing, or field deletion. Canonical items can appear in multiple fields without copies. Renames preserve stable file identity and curated names. Missing files and offline folders retain catalogue records. Removing a source item from its field records an exclusion so the next scan does not put it back; manually adding it again clears the exclusion. Unlinking keeps imported items and memberships.
 
-Right-click an item or field for quick actions, or use **Shift+F10** on a focused row. Delete a field through **Delete field** in its menu or the field page's **…** button. Deletion removes the field and its connections, keeps all archived items and PC files, and moves direct subfields to its parent. The overview's **Items** tab includes items without a field. Connection names are optional.
+Recursive scans skip symbolic links/junctions and FIELD app data. A scan is limited to 100,000 files; unreadable/oversized sources report an unavailable status and preserve existing records. Cross-volume moves still require relinking. Automatic folder updates run only while the app is open.
 
-Build the portable package from source with the .NET 10 SDK:
+## Organization
+
+Primary fields start collapsed. Use their chevrons to reveal subfields; opening a nested field expands its ancestry automatically.
+
+Hover an item to reveal its checkbox, or use the Select checkbox above the list to select all filtered items, including rows beyond the current page. Add to fields or Remove from fields applies to the selection. Undo / Ctrl+Z reverses the last organization operation while preserving later content edits and unrelated memberships. The last 20 bulk operations can be undone during the current session.
+
+Right-click items or fields, or use Shift+F10. Field deletion keeps items and PC files, promotes direct subfields, and removes incident connections. Connection names are optional. Image files show lazy thumbnails and larger detail previews; unsupported, corrupt, or oversized images retain normal file controls. The supplied icon, DM Sans, flat surfaces, and both themes are included.
+
+## Search and recovery
+
+Search uses indexed names, note text, URLs, and file paths with word/prefix matching. It shows at most 100 results. It does not index the contents of arbitrary PC documents.
+
+FIELD keeps up to seven daily catalogue backups while in use. **Library → Backups → Restore** creates a safety copy before restoring organization. Restore affects the catalogue, not original PC files. If a damaged catalogue prevents startup, the app offers explicit catalogue-backup recovery and retains the previous database and journal files. Backups do not copy source file contents or the separate native file-reference registry.
+
+Library exports remain portable JSON metadata. Browser libraries can be exported through the browser prototype and imported into an empty desktop catalogue. Drawings and notes are in the catalogue; linked PC file contents stay at their original locations.
+
+## Build and checks
+
+Build with the .NET 10 SDK:
 
 ```powershell
 powershell -NoProfile -File scripts/package-windows.ps1
-```
-
-The script bundles .NET 10.0.14, the WebView2 SDK loader, UI assets and dependency notices; it writes the extracted package, ZIP and SHA256 checksum to `dist/`. Use `-Force` for a rebuild; previous output is retained under a `.previous` name. See [desktop/PACKAGING.md](desktop/PACKAGING.md).
-
-Verification:
-
-```powershell
 node --test tests/*.test.js
-cd desktop
-dotnet run --project tests/backend/Field.BackendSmoke.csproj -- "C:\absolute\disposable-fixture-parent"
 ```
 
-The legacy HTTP prototype remains under `native/` for browser migration and development. Its command-line build requires the .NET 8 SDK; the packaged desktop app uses its native bridge directly and does not start that HTTP service.
-
-Image files show lazy thumbnails and a larger preview in the details panel. Desktop previews read registered local files, stay out of the saved catalogue, and use a bounded memory cache. Unsupported, missing, corrupt, and oversized images retain their file controls. The app icon is generated from assets/app-icon.png.
+Native checks live under `desktop/tests/{backend,storage,folders,previews}`. Pass an absolute disposable fixture parent to each executable. The portable build includes runtime and dependency notices and a SHA256 checksum. This alpha is unsigned and has no automatic updater.

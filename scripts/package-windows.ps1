@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?$')]
-    [string]$Version = '0.1.2-alpha',
+    [string]$Version = '0.2.0-alpha',
     [ValidatePattern('^10\.0\.\d+$')]
     [string]$RuntimeVersion = '10.0.14',
     [string]$OutputRoot = '',
@@ -41,7 +41,7 @@ if (-not $Force -and ((Test-Path -LiteralPath $packageDirectory) -or (Test-Path 
 }
 
 $uiAssets = @(
-    'index.html', 'app.js', 'appearance.js', 'drawing.js', 'library-model.js',
+    'index.html', 'app.js', 'library-ui.js', 'appearance.js', 'drawing.js', 'library-model.js',
     'library-storage.js', 'native-client.js', 'desktop-client.js', 'library-transfer.js', 'context-menu.js', 'map-geometry.js', 'image-previews.js', 'assets/app-icon.png', 'styles.css',
     'assets/field-logo.png', 'assets/fonts/dm-sans-latin-variable.woff2', 'assets/fonts/OFL.txt'
 )
@@ -127,9 +127,23 @@ $webViewEntry = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_
 if ($webViewEntry.Count -ne 1) { throw 'The WebView2 SDK version could not be identified.' }
 $webViewVersion = $webViewEntry[0].Split('/')[1]
 Copy-DependencyNotices 'Microsoft.Web.WebView2' $webViewVersion 'webview2'
+foreach ($name in @('Microsoft.Data.Sqlite-LICENSE.txt', 'SQLitePCLRaw-LICENSE.txt')) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot "licenses\$name") -Destination (Join-Path $licenseDirectory $name)
+}
+foreach ($entry in $assets.libraries.PSObject.Properties.Name | Where-Object { $_ -match '^(Microsoft\.Data\.Sqlite(?:\.Core)?|SQLitePCLRaw\.[^/]+|SQLite)/' }) {
+    $parts = $entry.Split('/')
+    foreach ($folder in $packageFolders) {
+        $dependency = Join-Path (Join-Path $folder $parts[0].ToLowerInvariant()) $parts[1].ToLowerInvariant()
+        if (-not (Test-Path -LiteralPath $dependency -PathType Container)) { continue }
+        Get-ChildItem -LiteralPath $dependency -Filter '*.nuspec' -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $licenseDirectory $_.Name) }
+        if ($parts[0] -eq 'SQLite') { Copy-Item -LiteralPath (Join-Path $dependency 'LICENSE.txt') -Destination (Join-Path $licenseDirectory 'SQLite-LICENSE.txt') }
+        break
+    }
+}
+if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory 'e_sqlite3.dll'))) { throw 'The package is missing its native SQLite runtime.' }
 
 $forbidden = @(Get-ChildItem -LiteralPath $publishDirectory -Recurse -File | Where-Object {
-    $_.Name -in @('library.json', 'file-references.json', 'file-references.lock', 'library.lock', '.env')
+    $_.Name -in @('library.json', 'library.sqlite', 'library.sqlite-wal', 'library.sqlite-shm', 'file-references.json', 'file-references.lock', 'library.lock', '.env')
 })
 if ($forbidden.Count -ne 0) { throw 'User data or local configuration was found in the portable package.' }
 $packageInfo = [ordered]@{

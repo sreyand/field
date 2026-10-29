@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text;
+using Microsoft.Data.Sqlite;
 using Field.Native;
 
 if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The desktop backend checks require Windows.");
@@ -17,6 +18,9 @@ async Task<bool> Fails(DesktopBackend backend, string method, object parameters)
     try { await Call(backend, method, parameters); return false; }
     catch (Exception error) when (error is ArgumentException or InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or KeyNotFoundException) { return true; }
 }
+void Sql(string directory,string sql) { using var connection=new SqliteConnection("Data Source="+Path.Combine(directory,"library.sqlite")); connection.Open(); using var command=connection.CreateCommand(); command.CommandText=sql; command.ExecuteNonQuery(); }
+string DiskState(string directory) { using var connection=new SqliteConnection("Data Source="+Path.Combine(directory,"library.sqlite")); connection.Open(); using var command=connection.CreateCommand(); command.CommandText="SELECT value FROM metadata WHERE key='revision' UNION ALL SELECT payload FROM items ORDER BY 1"; using var reader=command.ExecuteReader(); var result=new List<string>(); while(reader.Read())result.Add(reader.GetString(0)); return string.Join("\n",result); }
+const string blockCommit="CREATE TRIGGER block_commit BEFORE UPDATE ON metadata WHEN NEW.key='revision' BEGIN SELECT RAISE(ABORT,'Injected commit failure'); END;";
 JsonElement Snapshot(JsonNode node) => JsonSerializer.SerializeToElement(node, json);
 var original = Path.Combine(fixture, "original.txt");
 var moved = Path.Combine(fixture, "renamed.txt");
@@ -75,15 +79,14 @@ using (var backend = new DesktopBackend(data))
     var saved = await Call(backend, "library.save", new { snapshot = Snapshot(snapshot), expectedRevision = 1 });
     Check(saved.GetProperty("revision").GetInt32() == 2, "normal editing advances native revision");
     Check((await Call(backend, "library.load")).GetProperty("snapshot").GetProperty("items").GetArrayLength() == 6, "native storage preserves distinct escaped URL paths accepted by the UI");
-    var diskBefore = await File.ReadAllTextAsync(Path.Combine(data, "library.json"));
-    var block = Path.Combine(data, "library.json.tmp");
-    Directory.CreateDirectory(block);
+    var diskBefore = DiskState(data);
+    Sql(data, blockCommit);
     snapshot["items"]![1]!["body"] = "Must not commit";
     Check(await Fails(backend, "library.save", new { snapshot = Snapshot(snapshot), expectedRevision = 2 }), "disk write failure is reported");
-    Directory.Delete(block);
+    Sql(data, "DROP TRIGGER block_commit");
     var afterFailure = await Call(backend, "library.load");
     Check(afterFailure.GetProperty("revision").GetInt32() == 2 && afterFailure.GetProperty("snapshot").GetProperty("items")[1].GetProperty("body").GetString() == "Edited once", "failed write leaves in-memory catalogue unchanged");
-    Check(await File.ReadAllTextAsync(Path.Combine(data, "library.json")) == diskBefore, "failed write leaves saved catalogue unchanged");
+    Check(DiskState(data) == diskBefore, "failed write leaves saved catalogue unchanged");
     Check(await Fails(backend, "files.open", new { referenceId = Guid.NewGuid().ToString("N") }), "unknown file references cannot launch a path");
     Check(await Fails(backend, "files.resolve", new { referenceIds = new[] { "invalid" } }), "malformed native reference IDs are rejected");
     Check(await Fails(backend, "unknown.operation", new { }), "bridge only accepts known operations");
@@ -115,12 +118,11 @@ using (var backend = new DesktopBackend(failedLibraryData))
 {
     var existing = await Call(backend, "files.track", new { path = moved });
     var existingId = existing.GetProperty("reference").GetProperty("referenceId").GetString();
-    var block = Path.Combine(failedLibraryData, "library.json.tmp");
-    Directory.CreateDirectory(block);
+    Sql(failedLibraryData, blockCommit);
     Check(await Fails(backend, "library.import", new { snapshot = Snapshot(source), expectedRevision = 0 }), "library write failure after reference adoption is reported");
     var unchanged = await Call(backend, "library.load");
     Check(unchanged.GetProperty("revision").GetInt32() == 0 && unchanged.GetProperty("snapshot").GetProperty("items").GetArrayLength() == 0, "failed import commit never mutates the previous catalogue");
-    Directory.Delete(block);
+    Sql(failedLibraryData, "DROP TRIGGER block_commit");
     var retried = await Call(backend, "library.import", new { snapshot = Snapshot(source), expectedRevision = 0 });
     Check(retried.GetProperty("snapshot").GetProperty("items")[0].GetProperty("native").GetProperty("referenceId").GetString() == existingId, "import retry reconciles the browser reference to an existing native target");
 }

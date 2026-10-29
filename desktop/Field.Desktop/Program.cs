@@ -1,5 +1,6 @@
 using System.Windows;
 using Field.Native;
+using Microsoft.Win32;
 
 namespace Field.Desktop;
 
@@ -38,7 +39,20 @@ internal sealed class Program : Application
                 Shutdown();
                 return;
             }
-            backend = new DesktopBackend(options.DataDirectory);
+            try { backend = new DesktopBackend(options.DataDirectory); }
+            catch (Exception error) when (error is IOException or InvalidDataException or Microsoft.Data.Sqlite.SqliteException)
+            {
+                if (error.Message.Contains("file reference", StringComparison.OrdinalIgnoreCase)) throw;
+                var backups = Path.Combine(options.DataDirectory, "backups");
+                if (!Directory.Exists(backups) || !Directory.EnumerateFiles(backups, "*.sqlite").Any()) throw;
+                if (MessageBox.Show("FIELD could not open its catalogue.\n\n" + error.Message + "\n\nRestore a catalogue backup? The current catalogue is retained and PC files stay untouched.", "FIELD", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) { Shutdown(); return; }
+                var picker = new OpenFileDialog { Title = "Restore FIELD catalogue", InitialDirectory = backups, Filter = "FIELD backups (*.sqlite)|*.sqlite", CheckFileExists = true };
+                if (picker.ShowDialog() != true) { Shutdown(); return; }
+                if (!string.Equals(Path.GetDirectoryName(Path.GetFullPath(picker.FileName)), Path.GetFullPath(backups), StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("Choose a backup from FIELD's backups folder.");
+                DesktopLibraryStore.Recover(options.DataDirectory, Path.GetFileName(picker.FileName));
+                backend = new DesktopBackend(options.DataDirectory);
+            }
             var window = new FieldWindow(options, backend);
             MainWindow = window;
             instance.Listen(() => Dispatcher.BeginInvoke(() => window.BringToFront()));

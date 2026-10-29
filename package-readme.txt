@@ -20,5 +20,8 @@ Open FIELD in the same browser and location where the library was created.
 Use Library > Export library, then open FIELD.exe and use Library > Import library.
 Import is accepted only into an empty desktop library. The browser copy is preserved.
 
-This is the first unsigned desktop alpha. Automatic updates and an installer are not included.
+This is an unsigned desktop alpha. Automatic updates and an installer are not included.
 Bundled dependency notices are in licenses/. The DM Sans font license is in web/assets/fonts/OFL.txt.
+
+Version 0.2.0 upgrades the catalogue to SQLite and retains the previous JSON. Close older builds before opening this version; use this version for further edits after migration.
+Link a folder from Fields or a field menu. Original PC files stay in place. Select items to organize them in bulk; Undo reverses bulk membership changes. Library > Backups provides catalogue recovery copies.

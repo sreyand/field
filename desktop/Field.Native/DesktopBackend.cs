@@ -8,6 +8,7 @@ public sealed class DesktopBackend : IDisposable
 {
     private readonly DesktopLibraryStore library;
     private readonly FileReferenceService files;
+    private readonly FolderSyncService folders;
     private readonly SemaphoreSlim operations = new(1, 1);
     private bool disposed;
 
@@ -16,6 +17,7 @@ public sealed class DesktopBackend : IDisposable
         library = new(dataDirectory);
         try { files = new(dataDirectory); }
         catch { library.Dispose(); throw; }
+        folders = new(library, files, dataDirectory);
     }
 
     public async Task<object?> HandleAsync(string method, JsonElement args, nint ownerWindow = default)
@@ -27,7 +29,10 @@ public sealed class DesktopBackend : IDisposable
             if (args.ValueKind != JsonValueKind.Object) throw new ArgumentException("Request parameters must be an object.");
             switch (method)
             {
-                case "app.info": return new { app = "FIELD", version = "0.1.2-alpha", platform = "windows", storage = "native" };
+                case "app.info": return new { app = "FIELD", version = "0.2.0-alpha", platform = "windows", storage = "native" };
+                case "folders.attach": return folders.Attach(Text(args, "fieldId"), Text(args, "path"), Revision(args));
+                case "folders.detach": return folders.Detach(Text(args, "fieldId"), Revision(args));
+                case "folders.sync": return folders.Sync(Revision(args), args.TryGetProperty("force", out var force) && force.ValueKind == JsonValueKind.True);
                 case "files.track": return new { reference = files.Track(Text(args, "path")) };
                 case "files.resolve":
                     if (!args.TryGetProperty("referenceIds", out var ids) || ids.ValueKind != JsonValueKind.Array || ids.GetArrayLength() > 500)
@@ -39,6 +44,11 @@ public sealed class DesktopBackend : IDisposable
                     return selected is null ? new { cancelled = true } : new { reference = files.Track(selected) };
                 case "files.open": files.Open(ValidReferenceId(Text(args, "referenceId"))); return new { opened = true };
                 case "library.load": return library.Load();
+                case "library.search":
+                    if (!args.TryGetProperty("query", out var query) || query.ValueKind != JsonValueKind.String) throw new ArgumentException("A search query is required.");
+                    return new { results = library.QuerySearch(query.GetString()!, args.TryGetProperty("limit", out var limit) && limit.TryGetInt32(out var maximum) ? maximum : 100) };
+                case "library.backups": return new { backups = library.ListBackups() };
+                case "library.restore": return library.RestoreBackup(Text(args, "fileName"), Revision(args));
                 case "library.pickImport":
                     var importPath = await NativeFilePicker.Pick(ownerWindow, "FIELD libraries (*.json)\0*.json\0\0", "Import FIELD library").ConfigureAwait(false);
                     return importPath is null ? new { cancelled = true } : await SelectedLibraryFile.ReadAsync(importPath).ConfigureAwait(false);
@@ -72,7 +82,7 @@ public sealed class DesktopBackend : IDisposable
     public void Dispose()
     {
         operations.Wait();
-        try { if (disposed) return; disposed = true; files.Dispose(); library.Dispose(); }
+        try { if (disposed) return; disposed = true; folders.Dispose(); files.Dispose(); library.Dispose(); }
         finally { operations.Release(); }
     }
 

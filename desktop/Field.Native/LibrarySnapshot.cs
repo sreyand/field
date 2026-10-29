@@ -36,6 +36,17 @@ internal static class LibrarySnapshot
             Object(field, "Field");
             var id = Id(field, "id");
             Text(field, "name");
+            if (field.TryGetProperty("folder", out var folder))
+            {
+                Object(folder, "Linked folder");
+                WindowsPath(Text(folder, "path"));
+                foreach (var key in new[] { "itemIds", "excludedItemIds" })
+                    if (folder.TryGetProperty(key, out var linked))
+                    {
+                        if (linked.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Invalid linked folder items.");
+                        foreach (var linkedId in linked.EnumerateArray()) IdValue(linkedId);
+                    }
+            }
             if (!HexColor.IsMatch(Text(field, "color"))) throw new InvalidDataException("Invalid field color.");
             string? parent = null;
             if (field.TryGetProperty("parent", out var parentValue) && parentValue.ValueKind != JsonValueKind.Null)

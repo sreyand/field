@@ -231,6 +231,15 @@
       if (typeof record.color !== 'string' || !/^#[a-f0-9]{6}$/i.test(record.color)) throw new Error('Field color must be a six-digit hex color.');
       record.parent = record.parent ?? null;
       if (record.parent !== null) identifier(record.parent, 'Parent field ID');
+      if (record.folder !== undefined) {
+        plainObject(record.folder, 'Linked folder');
+        normalizedWindowsPath(record.folder.path);
+        for (const key of ['excludedItemIds', 'itemIds']) {
+          if (record.folder[key] === undefined) record.folder[key] = [];
+          if (!Array.isArray(record.folder[key])) throw new Error('Invalid linked folder items.');
+          record.folder[key].forEach(id => identifier(id, 'Linked item ID'));
+        }
+      }
       return record;
     }
 
@@ -343,9 +352,46 @@
       if (!this._itemById.has(id)) throw new Error('Item does not exist.');
       const unique = this._fieldIds(fieldIds);
       const memberships = this._memberships.get(id);
+      if (this._itemById.get(id).kind === 'file') for (const field of this.fields) {
+        if (!field.folder) continue;
+        const excluded = new Set(field.folder.excludedItemIds || []);
+        if (memberships.has(field.id) && !unique.includes(field.id)) excluded.add(id);
+        if (unique.includes(field.id)) excluded.delete(id);
+        field.folder.excludedItemIds = [...excluded];
+      }
       memberships.clear();
       unique.forEach(fieldId => memberships.add(fieldId));
       return this._itemById.get(id);
+    }
+
+    bulkMemberships(itemIds, fieldIds, mode) {
+      if (!Array.isArray(itemIds) || !itemIds.length) throw new Error('Select items.');
+      if (!['add', 'remove'].includes(mode)) throw new Error('Choose add or remove.');
+      const target = this._fieldIds(fieldIds);
+      if (!target.length) throw new Error('Choose fields.');
+      const selected = [...new Set(itemIds)].map(id => {
+        identifier(id, 'Item ID');
+        const item = this._itemById.get(id);
+        if (!item) throw new Error('Item does not exist.');
+        return item;
+      });
+      const changes = selected.map(item => {
+        const before = item.fields;
+        const after = mode === 'add' ? [...new Set([...before, ...target])] : before.filter(id => !target.includes(id));
+        return { id: item.id, added: after.filter(id => !before.includes(id)), removed: before.filter(id => !after.includes(id)), after };
+      });
+      for (const change of changes) this.setMemberships(change.id, change.after);
+      return changes.map(({after, ...change}) => change);
+    }
+
+    undoMemberships(changes) {
+      if (!Array.isArray(changes)) throw new Error('Invalid undo operation.');
+      const updates = changes.map(change => {
+        const item = this._itemById.get(identifier(change.id, 'Item ID'));
+        if (!item || !Array.isArray(change.added) || !Array.isArray(change.removed)) throw new Error('This operation cannot be undone.');
+        return [item.id, [...new Set([...item.fields.filter(id => !change.added.includes(id)), ...change.removed.filter(id => this._fieldById.has(id))])]];
+      });
+      for (const [id, fields] of updates) this.setMemberships(id, fields);
     }
 
     createConnection(source) {

@@ -22,11 +22,11 @@ internal sealed partial class FieldWindow : Window
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly HashSet<string> Methods = new(StringComparer.Ordinal)
     {
-        "app.info", "app.theme", "files.track", "files.resolve", "files.pick", "files.open", "files.preview", "library.load", "library.save", "library.import", "library.pickImport"
+        "app.info", "app.theme", "files.track", "files.resolve", "files.pick", "files.open", "files.preview", "library.load", "library.save", "library.import", "library.pickImport", "folders.pick", "folders.attach", "folders.sync", "folders.detach", "library.search", "library.backups", "library.restore"
     };
     private static readonly HashSet<string> Assets = new(StringComparer.Ordinal)
     {
-        "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-storage.js",
+        "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-storage.js", "/library-ui.js",
         "/desktop-client.js", "/library-transfer.js", "/context-menu.js", "/map-geometry.js", "/image-previews.js", "/assets/app-icon.png", "/native-client.js", "/app.js", "/assets/field-logo.png",
         "/assets/fonts/dm-sans-latin-variable.woff2", "/assets/fonts/OFL.txt"
     };
@@ -209,6 +209,13 @@ internal sealed partial class FieldWindow : Window
                 Reply(version, new { id, ok = true, result = new { } });
                 return;
             }
+            if (method == "folders.pick")
+            {
+                var dialog = new OpenFolderDialog { Title = "Link a folder to FIELD", Multiselect = false };
+                var selected = dialog.ShowDialog(this) == true ? dialog.FolderName : null;
+                Reply(version, new { id, ok = true, result = selected is null ? (object)new { cancelled = true } : new { path = selected } });
+                return;
+            }
             if (outstanding.Count > 32) throw new InvalidOperationException("FIELD is busy. Try again in a moment.");
             await operations.WaitAsync();
             try
@@ -227,7 +234,7 @@ internal sealed partial class FieldWindow : Window
             }
             finally { operations.Release(); }
         }
-        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or KeyNotFoundException)
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or KeyNotFoundException or Microsoft.Data.Sqlite.SqliteException)
         {
             if (id is not null) Reply(version, new { id, ok = false, error = new { message = error.Message, code = "REQUEST_FAILED" } });
         }
