@@ -352,3 +352,5 @@ html::-webkit-scrollbar { display: none; }
 @media (hover: none) { .item-select { opacity: 1; } }
 .item-thumbnail[data-image-preview][hidden], .detail-image[data-image-preview][hidden] { display: block; visibility: hidden; }
 .detail-image[data-image-preview] { min-height: 100px; object-fit: contain; }
+
+.item-row.pending-open { background: var(--hover); }

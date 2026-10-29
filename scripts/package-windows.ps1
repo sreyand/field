@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?$')]
-    [string]$Version = '0.2.1-alpha',
+    [string]$Version = '0.2.2-alpha',
     [ValidatePattern('^10\.0\.\d+$')]
     [string]$RuntimeVersion = '10.0.14',
     [string]$OutputRoot = '',
@@ -41,7 +41,7 @@ if (-not $Force -and ((Test-Path -LiteralPath $packageDirectory) -or (Test-Path 
 }
 
 $uiAssets = @(
-    'index.html', 'app.js', 'library-ui.js', 'appearance.js', 'drawing.js', 'library-model.js',
+    'index.html', 'app.js', 'library-ui.js', 'item-activation.js', 'appearance.js', 'drawing.js', 'library-model.js',
     'library-storage.js', 'native-client.js', 'desktop-client.js', 'library-transfer.js', 'context-menu.js', 'map-geometry.js', 'image-previews.js', 'assets/app-icon.png', 'styles.css',
     'assets/field-logo.png', 'assets/fonts/dm-sans-latin-variable.woff2', 'assets/fonts/OFL.txt'
 )

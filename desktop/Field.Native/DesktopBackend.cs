@@ -29,7 +29,7 @@ public sealed class DesktopBackend : IDisposable
             if (args.ValueKind != JsonValueKind.Object) throw new ArgumentException("Request parameters must be an object.");
             switch (method)
             {
-                case "app.info": return new { app = "FIELD", version = "0.2.1-alpha", platform = "windows", storage = "native" };
+                case "app.info": return new { app = "FIELD", version = "0.2.2-alpha", platform = "windows", storage = "native", doubleClickMilliseconds = GetDoubleClickTime() };
                 case "folders.attach": return folders.Attach(Text(args, "fieldId"), Text(args, "path"), Revision(args));
                 case "folders.detach": return folders.Detach(Text(args, "fieldId"), Revision(args));
                 case "folders.sync": return folders.Sync(Revision(args), args.TryGetProperty("force", out var force) && force.ValueKind == JsonValueKind.True);
@@ -85,6 +85,9 @@ public sealed class DesktopBackend : IDisposable
         try { if (disposed) return; disposed = true; folders.Dispose(); files.Dispose(); library.Dispose(); }
         finally { operations.Release(); }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDoubleClickTime();
 
     private static JsonElement Snapshot(JsonElement args) => args.TryGetProperty("snapshot", out var snapshot) ? snapshot :
         throw new ArgumentException("A library snapshot is required.");

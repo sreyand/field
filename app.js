@@ -66,6 +66,21 @@ const fileStates = new Map();
 const native = window.FieldNative;
 const repository = window.FieldStorage.open();
 const quickMenu = window.FieldContextMenu.create({ document, window });
+let doubleClickMilliseconds = 500;
+let pendingItemNode = null;
+window.FieldDesktop?.ready.then(info => {
+  if (Number.isFinite(info?.doubleClickMilliseconds)) doubleClickMilliseconds = info.doubleClickMilliseconds;
+}).catch(() => {});
+const itemActivation = window.FieldActivation.create({
+  getItem: byItem, showDetails: openItem, openFile: openStoredFile,
+  canActivate: () => isReady && !isSaving && !nativeBusy && !$('#modal').open,
+  getDelay: () => doubleClickMilliseconds,
+  onPending: id => {
+    pendingItemNode?.classList.remove('pending-open');
+    pendingItemNode = id ? document.querySelector(`[data-action="open-item"][data-id="${id}"]`) : null;
+    pendingItemNode?.classList.add('pending-open');
+  }
+});
 
 function applyModel(model) {
   canonicalModel = model;
@@ -132,7 +147,7 @@ function renderFileChanges() {
 }
 
 async function syncFileReferences(force = false) {
-  if (!isReady || isSaving || nativeBusy || syncingFiles || fileSyncPaused || $('#modal').open || quickMenu.isOpen || dragged || document.hidden && !force) return;
+  if (!isReady || isSaving || nativeBusy || syncingFiles || fileSyncPaused || $('#modal').open || quickMenu.isOpen || itemActivation.pending || dragged || document.hidden && !force) return;
   const visibleIds = new Set([...document.querySelectorAll('.item-row[data-id]')].map(node => node.dataset.id));
   if (openItemId) visibleIds.add(openItemId);
   const tracked = items.filter(item => item.kind === 'file' && item.native && (items.length <= 250 || visibleIds.has(item.id)));
@@ -144,7 +159,7 @@ async function syncFileReferences(force = false) {
     const ids = [...new Set(tracked.map(item => item.native.referenceId))];
     for (let offset = 0; offset < ids.length; offset += 100) references.push(...await native.resolve(ids.slice(offset, offset + 100)));
     // A modal or relink may have opened while metadata was being checked.
-    if (isSaving || nativeBusy || $('#modal').open || quickMenu.isOpen) return;
+    if (isSaving || nativeBusy || $('#modal').open || quickMenu.isOpen || itemActivation.pending) return;
     const found = new Map(references.map(reference => [reference.referenceId, reference]));
     const updates = [];
     let statesChanged = false;
@@ -172,7 +187,7 @@ async function syncFileReferences(force = false) {
 }
 
 window.addEventListener('field-runtime-change', () => {
-  if (isReady && !isSaving && !nativeBusy && !$('#modal').open) renderFileChanges();
+  if (isReady && !isSaving && !nativeBusy && !$('#modal').open && !itemActivation.pending) renderFileChanges();
 });
 setInterval(syncFileReferences, 2500);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFileReferences(true); });
@@ -266,6 +281,7 @@ function renderSidebar() {
 }
 
 function render() {
+  itemActivation.cancel();
   quickMenu.close({ restoreFocus: false });
   mapObserver?.disconnect();
   if (!isReady) {
@@ -405,6 +421,7 @@ function initMap() {
 }
 
 function showModal(title, html, wide = false) {
+  itemActivation.cancel();
   quickMenu.close();
   drawingPad?.destroy();
   drawingPad = null;
@@ -631,12 +648,20 @@ async function copyText(text, message) {
   catch { toast('Clipboard unavailable'); }
 }
 
-async function openNativeFile(id) {
+async function openNativeFile(id) { return openStoredFile(id); }
+
+async function openStoredFile(id) {
   const item = byItem(id);
-  if (!item?.native || fileState(item).status !== 'available') return;
+  if (item?.kind !== 'file' || nativeBusy) return;
   nativeBusy = true;
-  try { await native.open(item.native.referenceId); }
-  catch (error) { toast(error.message); }
+  try {
+    if (item.native) await native.open(item.native.referenceId);
+    else if (item.path && (native.available || await native.connect())) {
+      const reference = await native.track(item.path);
+      await native.open(reference.referenceId);
+    } else if (!window.FieldDesktop?.isDesktop && attachments.has(id)) window.open(attachments.get(id).url, '_blank', 'noopener,noreferrer');
+    else { openItem(id); toast('Relink this file to open it.'); }
+  } catch (error) { toast(error.message); }
   finally { nativeBusy = false; renderFileChanges(); syncFileReferences(true); }
 }
 
@@ -644,8 +669,7 @@ function openItemTarget(id) {
   const item = byItem(id);
   if (!item) return;
   if (item.kind === 'link') window.open(item.url, '_blank', 'noopener,noreferrer');
-  else if (item.kind === 'file' && item.native) openNativeFile(id);
-  else if (item.kind === 'file' && attachments.has(id)) window.open(attachments.get(id).url, '_blank', 'noopener,noreferrer');
+  else if (item.kind === 'file') openStoredFile(id);
   else openItem(id);
 }
 
@@ -678,7 +702,7 @@ function itemQuickActions(item) {
   if (item.kind === 'file' && item.native) {
     entries.push({ label: 'Open file', icon: icon('external'), disabled: fileState(item).status !== 'available', run: () => openNativeFile(item.id) });
   } else {
-    entries.push({ label: item.kind === 'file' && attachments.has(item.id) ? 'Open file' : 'Open', icon: icon('external'), run: () => openItemTarget(item.id) });
+    entries.push({ label: item.kind === 'file' && (item.path || attachments.has(item.id)) ? 'Open file' : 'Open', icon: icon('external'), run: () => openItemTarget(item.id) });
   }
   if (item.kind === 'file' && item.path) entries.push({ label: 'Copy path', icon: icon('copy'), run: () => copyText(byItem(item.id).path, 'Path copied') });
   if (item.kind === 'link') entries.push({ label: 'Copy link', icon: icon('copy'), run: () => copyText(byItem(item.id).url, 'Link copied') });
@@ -749,6 +773,7 @@ function quickMenuFor(target) {
 }
 
 function showQuickMenu(target, x, y) {
+  itemActivation.cancel();
   const menu = quickMenuFor(target);
   if (!menu) { quickMenu.close(); return; }
   const add = $('#add-menu');
@@ -947,7 +972,7 @@ document.addEventListener('click', async event => {
       case 'edit-item': compose(byItem(id).kind, id); break;
       case 'relink-file': compose('file', id, Boolean(byItem(id).native || native.available)); break;
       case 'open-native-file': await openNativeFile(id); break;
-      case 'open-item': openItem(id); break;
+      case 'open-item': itemActivation.click(id, event.detail); break;
       case 'share-item': shareItem(id); break;
       case 'add-existing':
         $('#add-menu').hidden = true;

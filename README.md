@@ -1,6 +1,6 @@
 # FIELD — Windows alpha 0.2.0
 
-Close older FIELD builds, then run `dist/FIELD-0.2.1-alpha-win-x64/FIELD.exe`, or use `Open FIELD.cmd`. Extract the complete ZIP when moving the application. The portable x64 package includes .NET; WebView2 Evergreen Runtime is required.
+Close older FIELD builds, then run `dist/FIELD-0.2.2-alpha-win-x64/FIELD.exe`, or use `Open FIELD.cmd`. Extract the complete ZIP when moving the application. The portable x64 package includes .NET; WebView2 Evergreen Runtime is required.
 
 ## Catalogue and migration
 
@@ -42,3 +42,5 @@ node --test tests/*.test.js
 ```
 
 Native checks live under `desktop/tests/{backend,storage,folders,previews}`. Pass an absolute disposable fixture parent to each executable. The portable build includes runtime and dependency notices and a SHA256 checksum. This alpha is unsigned and has no automatic updater.
+
+Double-click a stored PC file to open it with its default Windows application. Single-click shows details after the Windows double-click interval; keyboard activation still shows details immediately. Opening a tracked file resolves its identity again, and missing files report an error. PC files stay in place.

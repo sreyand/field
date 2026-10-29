@@ -26,7 +26,7 @@ internal sealed partial class FieldWindow : Window
     };
     private static readonly HashSet<string> Assets = new(StringComparer.Ordinal)
     {
-        "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-storage.js", "/library-ui.js",
+        "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-storage.js", "/library-ui.js", "/item-activation.js",
         "/desktop-client.js", "/library-transfer.js", "/context-menu.js", "/map-geometry.js", "/image-previews.js", "/assets/app-icon.png", "/native-client.js", "/app.js", "/assets/field-logo.png",
         "/assets/fonts/dm-sans-latin-variable.woff2", "/assets/fonts/OFL.txt"
     };

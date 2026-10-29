@@ -25,7 +25,7 @@ var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvar
 var expectedHost = $"127.0.0.1:{options.Port}";
 var staticFiles = new HashSet<string>(StringComparer.Ordinal)
 {
-    "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-ui.js",
+    "/index.html", "/styles.css", "/appearance.js", "/drawing.js", "/library-model.js", "/library-ui.js", "/item-activation.js",
     "/library-storage.js", "/native-client.js", "/desktop-client.js", "/library-transfer.js", "/context-menu.js", "/map-geometry.js", "/image-previews.js", "/assets/app-icon.png", "/app.js", "/assets/field-logo.png",
     "/assets/fonts/dm-sans-latin-variable.woff2", "/assets/fonts/OFL.txt"
 };

@@ -75,7 +75,7 @@
   }
 
   async function syncFolders(force = false) {
-    if (!desktop || !isReady || isSaving || nativeBusy || syncingFiles || synchronizing || $('#modal').open || quickMenu.isOpen || selected.size || !fields.some(field=>field.folder)) return;
+    if (!desktop || !isReady || isSaving || nativeBusy || syncingFiles || synchronizing || $('#modal').open || quickMenu.isOpen || (typeof itemActivation !== 'undefined' && itemActivation.pending) || selected.size || !fields.some(field=>field.folder)) return;
     synchronizing = true; nativeBusy = true;
     document.body.setAttribute('aria-busy', 'true');
     try {
